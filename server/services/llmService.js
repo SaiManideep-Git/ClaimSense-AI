@@ -85,8 +85,13 @@ async function extractWithGemini(file, docType) {
 
   const result = await model.generateContent({
     contents: [
-      { text: prompt },
-      { inlineData }
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData }
+        ]
+      }
     ],
     generationConfig: {
       responseMimeType: "application/json"
