@@ -49,38 +49,56 @@ async function extractDocumentData(file, docType, claimContext = {}) {
   const hasGeminiKey = !!process.env.GEMINI_API_KEY;
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 
-  // Immediately use mock extraction for test cases (since they use dummy/virtual text files)
-  if (isTestCase) {
-    console.log(`[LLM] Test Case detected (${testCaseId || 'from filename'}). Using mock extraction fallback.`);
-    return getMockExtraction(file, docType, testCaseId);
-  }
+  let extracted = {};
 
   if (!hasGeminiKey && !hasOpenAIKey) {
     console.log(`[LLM] API keys missing. Using mock extraction for ${file.originalname || docType}.`);
-    return getMockExtraction(file, docType, testCaseId);
+    extracted = getMockExtraction(file, docType, testCaseId);
+  } else {
+    try {
+      if (hasGeminiKey) {
+        try {
+          console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
+          extracted = await extractWithGemini(file, docType);
+        } catch (geminiErr) {
+          console.warn(`[LLM] Gemini API failed: ${geminiErr.message}.`);
+          if (hasOpenAIKey) {
+            console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
+            extracted = await extractWithOpenAI(file, docType);
+          } else {
+            throw geminiErr;
+          }
+        }
+      } else if (hasOpenAIKey) {
+        console.log(`[LLM] Processing with OpenAI API: ${file.originalname}`);
+        extracted = await extractWithOpenAI(file, docType);
+      }
+    } catch (err) {
+      console.error(`[LLM] Live API extraction failed: ${err.message}. Falling back to mock extraction.`);
+      extracted = getMockExtraction(file, docType, testCaseId);
+    }
   }
 
-  try {
-    if (hasGeminiKey) {
-      try {
-        console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
-        return await extractWithGemini(file, docType);
-      } catch (geminiErr) {
-        console.warn(`[LLM] Gemini API failed: ${geminiErr.message}.`);
-        if (hasOpenAIKey) {
-          console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
-          return await extractWithOpenAI(file, docType);
-        }
-        throw geminiErr;
-      }
-    } else if (hasOpenAIKey) {
-      console.log(`[LLM] Processing with OpenAI API: ${file.originalname}`);
-      return await extractWithOpenAI(file, docType);
-    }
-  } catch (err) {
-    console.error(`[LLM] Live API extraction failed: ${err.message}. Falling back to mock extraction.`);
-    return getMockExtraction(file, docType, testCaseId);
+  // Merge with mock extraction for test cases so that missing/empty fields on dummy files are populated
+  if (isTestCase) {
+    const mock = getMockExtraction(file, docType, testCaseId);
+    extracted = {
+      patientName: extracted.patientName || mock.patientName || claimContext.memberName,
+      hospitalName: extracted.hospitalName || mock.hospitalName || claimContext.hospital || '',
+      doctorName: extracted.doctorName || mock.doctorName || '',
+      doctorReg: extracted.doctorReg || mock.doctorReg || '',
+      consultationDate: extracted.consultationDate || mock.consultationDate || claimContext.treatmentDate,
+      claimAmount: extracted.claimAmount || mock.claimAmount || claimContext.claimAmount,
+      consultationFee: extracted.consultationFee || mock.consultationFee || 0,
+      medicines: (extracted.medicines && extracted.medicines.length) ? extracted.medicines : (mock.medicines || []),
+      tests: (extracted.tests && extracted.tests.length) ? extracted.tests : (mock.tests || []),
+      procedures: (extracted.procedures && extracted.procedures.length) ? extracted.procedures : (mock.procedures || []),
+      diagnosis: extracted.diagnosis || mock.diagnosis || '',
+      claimType: extracted.claimType || mock.claimType || 'OPD'
+    };
   }
+
+  return extracted;
 }
 
 /**
@@ -93,7 +111,7 @@ async function extractWithGemini(file, docType) {
 
   const inlineData = {
     data: file.buffer.toString('base64'),
-    mimeType: file.mimetype
+    mimeType: getSafeMimeType(file)
   };
 
   const prompt = `${SYSTEM_PROMPT}\n\nDocument Category: ${docType}\nExtract information from this medical document:`;
@@ -131,8 +149,9 @@ async function extractWithOpenAI(file, docType) {
     }
   ];
 
+  const safeMime = getSafeMimeType(file);
   // OpenAI gpt-4o-mini supports image URLs/base64
-  if (file.mimetype.startsWith('image/')) {
+  if (safeMime.startsWith('image/')) {
     messages.push({
       role: 'user',
       content: [
@@ -140,19 +159,16 @@ async function extractWithOpenAI(file, docType) {
         {
           type: 'image_url',
           image_url: {
-            url: `data:${file.mimetype};base64,${base64Image}`
+            url: `data:${safeMime};base64,${base64Image}`
           }
         }
       ]
     });
   } else {
-    // If it's a PDF, we can use a basic text parsing fallback if we can't send it directly to OpenAI
-    // For MVP simplicity, we will just send a mock request or extract text if needed
-    // In real systems, we convert PDF pages to images for GPT-4o, but since we are handling this,
-    // let's pass a warning or use a basic prompt if it is plain text.
+    // If it's plain text (e.g. virtual files) or PDF, parse it as text content
     messages.push({
       role: 'user',
-      content: `Document Category: ${docType}. PDF file uploaded. Extract text data if visible: ${file.originalname}`
+      content: `Document Category: ${docType}. Document Content: ${file.buffer.toString('utf8')}`
     });
   }
 
@@ -239,6 +255,38 @@ function getMockExtraction(file, docType, testCaseId) {
     diagnosis: "Viral fever",
     claimType: "OPD"
   };
+}
+
+/**
+ * Safely determines the mimetype of a file by verifying magic numbers of images/PDFs.
+ * If file metadata claims it's an image/PDF but the buffer contains plain text (e.g. mock test case files),
+ * returns 'text/plain' to avoid crashing live AI image decoders.
+ */
+function getSafeMimeType(file) {
+  if (!file || !file.buffer || file.buffer.length < 4) {
+    return 'text/plain';
+  }
+  
+  const buffer = file.buffer;
+  
+  // Check magic bytes:
+  const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  const isPdf = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  const isJpg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+
+  const currentMime = (file.mimetype || '').toLowerCase();
+  
+  if (currentMime.startsWith('image/png') && !isPng) {
+    return 'text/plain';
+  }
+  if (currentMime.startsWith('application/pdf') && !isPdf) {
+    return 'text/plain';
+  }
+  if ((currentMime.startsWith('image/jpeg') || currentMime.startsWith('image/jpg')) && !isJpg) {
+    return 'text/plain';
+  }
+  
+  return file.mimetype || 'application/octet-stream';
 }
 
 module.exports = {
