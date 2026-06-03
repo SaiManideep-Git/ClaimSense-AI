@@ -202,7 +202,17 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to adjudicate claim');
+        let errMsg = 'Failed to adjudicate claim';
+        try {
+          const errData = await response.json();
+          errMsg = errData.error || errData.message || errMsg;
+          if (errData.details) {
+            errMsg += `: ${errData.details}`;
+          }
+        } catch (jsonErr) {
+          // Fallback if not JSON
+        }
+        throw new Error(errMsg);
       }
 
       const claimData = await response.json();
