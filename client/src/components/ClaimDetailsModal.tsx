@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, FileText, CheckCircle, AlertTriangle, AlertCircle, ArrowRight, ShieldCheck, CornerDownRight } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 interface ClaimDetails {
   _id: string;
   claimId: string;
@@ -71,7 +73,7 @@ export const ClaimDetailsModal: React.FC<Props> = ({ claim, onClose, onUpdate })
 
     setIsSubmittingAppeal(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/claims/${claim._id}/appeal`, {
+      const response = await fetch(`${API_URL}/api/claims/${claim._id}/appeal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

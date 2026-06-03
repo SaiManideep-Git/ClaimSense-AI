@@ -153,7 +153,13 @@ async function extractWithOpenAI(file, docType) {
 function getMockExtraction(file, docType, testCaseId) {
   // Load test cases to see if we can extract matching data
   try {
-    const testCasesPath = path.join(__dirname, '../../plum_intern_assignment/test_cases.json');
+    let testCasesPath = path.join(__dirname, '../../plum_intern_assignment/test_cases.json');
+    if (!fs.existsSync(testCasesPath)) {
+      testCasesPath = path.join(__dirname, '../test_cases.json');
+    }
+    if (!fs.existsSync(testCasesPath)) {
+      testCasesPath = path.join(__dirname, 'test_cases.json');
+    }
     const testCasesData = JSON.parse(fs.readFileSync(testCasesPath, 'utf8'));
     
     // Find matching case

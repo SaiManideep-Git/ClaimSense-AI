@@ -224,7 +224,13 @@ router.post('/:id/appeal', async (req, res) => {
  */
 router.get('/test-suite/run', async (req, res) => {
   try {
-    const testCasesPath = path.join(__dirname, '../../plum_intern_assignment/test_cases.json');
+    let testCasesPath = path.join(__dirname, '../../plum_intern_assignment/test_cases.json');
+    if (!fs.existsSync(testCasesPath)) {
+      testCasesPath = path.join(__dirname, '../test_cases.json');
+    }
+    if (!fs.existsSync(testCasesPath)) {
+      testCasesPath = path.join(__dirname, 'test_cases.json');
+    }
     const testCasesData = JSON.parse(fs.readFileSync(testCasesPath, 'utf8'));
     
     const results = [];

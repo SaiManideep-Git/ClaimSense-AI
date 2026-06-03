@@ -4,6 +4,10 @@ import { PolicyViewer } from './components/PolicyViewer';
 import { TestSuiteRunner } from './components/TestSuiteRunner';
 import { ClaimDetailsModal } from './components/ClaimDetailsModal';
 
+import testCasesData from './test_cases.json';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 interface Claim {
   _id: string;
   claimId: string;
@@ -54,7 +58,7 @@ export default function App() {
   const fetchClaimsHistory = async () => {
     setIsLoadingHistory(true);
     try {
-      const response = await fetch('http://localhost:5000/api/claims');
+      const response = await fetch(`${API_URL}/api/claims`);
       const data = await response.json();
       setClaims(data);
     } catch (e) {
@@ -71,17 +75,15 @@ export default function App() {
   }, [activeTab]);
 
   // Pre-fill form from test cases definition
-  const handleTestCaseSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleTestCaseSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
     setTestCaseId(id);
     if (!id) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/claims/test-suite/run');
-      const testSuiteData = await response.json();
-      const tc = testSuiteData.results.find((r: any) => r.caseId === id);
+      const tc = testCasesData.test_cases.find((r: any) => r.case_id === id);
       if (tc) {
-        const input = tc.input;
+        const input = tc.input_data;
         setMemberId(input.member_id);
         setMemberName(input.member_name);
         setTreatmentDate(input.treatment_date);
@@ -99,7 +101,7 @@ export default function App() {
         setBillFile(new File([mockBillContent], `${id}_Bill.png`, { type: 'image/png' }));
       }
     } catch (err) {
-      console.error('Failed to fetch test case details:', err);
+      console.error('Failed to parse local test case details:', err);
     }
   };
 
@@ -176,7 +178,7 @@ export default function App() {
         formData.append('bill', billFile);
       }
 
-      const response = await fetch('http://localhost:5000/api/claims/submit', {
+      const response = await fetch(`${API_URL}/api/claims/submit`, {
         method: 'POST',
         body: formData,
       });

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { PlayCircle, CheckCircle2, XCircle, Clock, Award, ShieldAlert, Cpu, Sparkles } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 interface TestCaseResult {
   caseId: string;
   caseName: string;
@@ -43,13 +45,13 @@ export const TestSuiteRunner: React.FC = () => {
   const runTestSuite = async () => {
     setIsRunning(true);
     try {
-      const response = await fetch('http://localhost:5000/api/claims/test-suite/run');
+      const response = await fetch(`${API_URL}/api/claims/test-suite/run`);
       const data = await response.json();
       setSummary(data.summary);
       setResults(data.results);
     } catch (err) {
       console.error('Failed to run test suite:', err);
-      alert('Error running test suite. Make sure your server is running on port 5000.');
+      alert('Error running test suite. Make sure your server is running and accessible.');
     } finally {
       setIsRunning(false);
     }
