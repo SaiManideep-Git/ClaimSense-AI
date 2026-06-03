@@ -54,6 +54,24 @@ export default function App() {
   const [createdClaim, setCreatedClaim] = useState<Claim | null>(null);
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
 
+  // API URL Validation Warning
+  const [urlWarningMessage, setUrlWarningMessage] = useState('');
+
+  useEffect(() => {
+    const isLocalhostHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isLocalhostApi = API_URL.includes('localhost') || API_URL.includes('127.0.0.1');
+    const isMissingProtocol = !API_URL.startsWith('http://') && !API_URL.startsWith('https://');
+    const isHttpOnly = API_URL.startsWith('http://') && !isLocalhostApi;
+
+    if (!isLocalhostHost && isLocalhostApi) {
+      setUrlWarningMessage(`Your frontend is deployed at '${window.location.hostname}', but it is currently attempting to connect to a local backend at '${API_URL}'. Please set the VITE_API_URL environment variable in your Vercel project settings to your deployed Render service URL.`);
+    } else if (isMissingProtocol) {
+      setUrlWarningMessage(`Your VITE_API_URL ('${API_URL}') is missing the 'http://' or 'https://' prefix. Make sure it starts with 'https://' to allow the browser to make secure network requests.`);
+    } else if (isHttpOnly) {
+      setUrlWarningMessage(`Your VITE_API_URL is configured with insecure 'http://' on a secure 'https://' website. The browser will block this request due to Mixed Content policy. Please update VITE_API_URL in Vercel to use 'https://'.`);
+    }
+  }, []);
+
   // Load claims history
   const fetchClaimsHistory = async () => {
     setIsLoadingHistory(true);
@@ -219,6 +237,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {urlWarningMessage && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-3 text-center text-xs text-amber-400 font-semibold flex items-center justify-center gap-2 animate-fade-in relative z-50">
+          <AlertCircle className="w-4.5 h-4.5 shrink-0" />
+          <span>
+            <strong>Configuration Alert:</strong> {urlWarningMessage}
+          </span>
+        </div>
+      )}
       
       {/* Top Navigation */}
       <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
