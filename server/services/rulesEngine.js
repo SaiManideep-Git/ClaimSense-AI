@@ -349,9 +349,10 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
 
   if (claimCategory === 'OPD') {
     if (isNetworkHospital) {
-      result.deductions.networkDiscount = eligibleBaseAmount * (networkDiscount / 100);
-      result.approvedAmount = eligibleBaseAmount - result.deductions.networkDiscount;
-      result.notes = `Network hospital discount of ${networkDiscount}% applied.`;
+      result.deductions.networkDiscount = 0;
+      result.deductions.copay = 0;
+      result.approvedAmount = eligibleBaseAmount;
+      result.notes = `Treatment at network hospital: 0% co-payment applied. (Insurer benefits from pre-negotiated ${networkDiscount}% provider discount on the backend).`;
     } else {
       result.deductions.copay = eligibleBaseAmount * (copayPercentage / 100);
       result.approvedAmount = eligibleBaseAmount - result.deductions.copay;
