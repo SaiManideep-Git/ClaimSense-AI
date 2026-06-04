@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, History, Sparkles, User, Calendar, CreditCard, Network, AlertCircle } from 'lucide-react';
 import { PolicyViewer } from './components/PolicyViewer';
-import { TestSuiteRunner } from './components/TestSuiteRunner';
 import { ClaimDetailsModal } from './components/ClaimDetailsModal';
 
 import testCasesData from './test_cases.json';
@@ -298,7 +297,7 @@ const fetchSampleDocument = async (
 
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'submit' | 'history' | 'testsuite' | 'policy'>('submit');
+  const [activeTab, setActiveTab] = useState<'submit' | 'history' | 'policy'>('submit');
   const [claims, setClaims] = useState<Claim[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
@@ -559,12 +558,6 @@ export default function App() {
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition cursor-pointer ${activeTab === 'history' ? 'bg-slate-900 text-brand-400 border border-slate-800' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <History className="w-4 h-4" /> Claim History
-            </button>
-            <button
-              onClick={() => setActiveTab('testsuite')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition cursor-pointer ${activeTab === 'testsuite' ? 'bg-slate-900 text-brand-400 border border-slate-800' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <ClipboardList className="w-4 h-4" /> Test Suite
             </button>
             <button
               onClick={() => setActiveTab('policy')}
@@ -955,9 +948,6 @@ export default function App() {
             )}
           </div>
         )}
-
-        {/* Tab 3: Verification Suite */}
-        {activeTab === 'testsuite' && <TestSuiteRunner />}
 
         {/* Tab 4: Policy Limits */}
         {activeTab === 'policy' && <PolicyViewer />}
