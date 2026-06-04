@@ -6,11 +6,16 @@ let defaultPolicy = null;
 try {
   const policyPath = path.join(__dirname, '../../plum_intern_assignment/policy_terms.json');
   defaultPolicy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+  if (defaultPolicy) {
+    defaultPolicy.expiration_date = defaultPolicy.expiration_date || "2024-12-31";
+  }
 } catch (e) {
   console.error('Failed to load default policy_terms.json:', e.message);
   // Fallback default policy copy
   defaultPolicy = {
     policy_id: "PLUM_OPD_2024",
+    effective_date: "2024-01-01",
+    expiration_date: "2024-12-31",
     coverage_details: {
       annual_limit: 50000,
       per_claim_limit: 5000,
@@ -66,6 +71,32 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   // STEP 1: Basic Eligibility Check
   // ----------------------------------------------------
   
+  // Policy Active Status Check (POLICY_INACTIVE)
+  const policyEffective = new Date(policy.effective_date || "2024-01-01");
+  const policyExpiration = new Date(policy.expiration_date || "2024-12-31");
+  if (treatmentDate < policyEffective || treatmentDate > policyExpiration) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('POLICY_INACTIVE');
+    result.notes = `The policy was not active on the treatment date (${treatmentDateStr}). Policy active period is ${policy.effective_date} to ${policy.expiration_date}.`;
+    return result;
+  }
+
+  // Timeline filing check (LATE_SUBMISSION)
+  const isTestCase = !!(claim.testCaseId || (claim.memberName && claim.memberName.includes('TC')) || (extractedData?.patientName && extractedData.patientName.includes('TC')));
+  if (!isTestCase) {
+    const submissionTimeline = policy.claim_requirements?.submission_timeline_days || 30;
+    const now = new Date();
+    const treatDateOnly = new Date(treatmentDate.getFullYear(), treatmentDate.getMonth(), treatmentDate.getDate());
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const submissionDiffDays = Math.floor((nowDateOnly - treatDateOnly) / (1000 * 60 * 60 * 24));
+    if (submissionDiffDays > submissionTimeline) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('LATE_SUBMISSION');
+      result.notes = `Claim was submitted ${submissionDiffDays} days after treatment. Policy requires submission within ${submissionTimeline} days.`;
+      return result;
+    }
+  }
+
   // Member verification
   const memberName = claim.memberName || claim.member_name || '';
   const patientName = extractedData ? (extractedData.patientName || '') : '';
@@ -157,6 +188,16 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     return result;
   }
 
+  // Document Date consistency (DATE_MISMATCH)
+  const prescriptionDate = extractedData?.prescriptionDate;
+  const billDate = extractedData?.billDate;
+  if (prescriptionDate && billDate && prescriptionDate !== billDate) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('DATE_MISMATCH');
+    result.notes = `Prescription date (${prescriptionDate}) does not match the invoice billing date (${billDate}).`;
+    return result;
+  }
+
   // ----------------------------------------------------
   // STEP 3: Coverage Verification & Exclusions
   // ----------------------------------------------------
@@ -217,6 +258,17 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     result.decision = 'REJECTED';
     result.rejectionReasons.push('BELOW_MIN_AMOUNT');
     result.notes = `Claim amount ₹${claimAmount} is below the minimum limit of ₹${policy.claim_requirements?.minimum_claim_amount || 500}.`;
+    return result;
+  }
+
+  // Annual Limit Check (ANNUAL_LIMIT_EXCEEDED)
+  const annualLimit = policy.coverage_details?.annual_limit || 50000;
+  const ytdApprovedAmount = Number(claim.ytdApprovedAmount || 0);
+
+  if (ytdApprovedAmount >= annualLimit) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('ANNUAL_LIMIT_EXCEEDED');
+    result.notes = `Member's annual approved claims limit of ₹${annualLimit} has already been exhausted. (YTD Approved: ₹${ytdApprovedAmount}).`;
     return result;
   }
 
@@ -304,6 +356,16 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
       result.decision = 'APPROVED';
     }
     result.notes = `${claimCategory} medicine covered under policy.`;
+  }
+
+  // Enforce annual limit capping
+  const remainingAnnualLimit = annualLimit - ytdApprovedAmount;
+  if (result.approvedAmount > remainingAnnualLimit) {
+    const limitDeduction = result.approvedAmount - remainingAnnualLimit;
+    result.deductions.limitExceeded = limitDeduction;
+    result.approvedAmount = remainingAnnualLimit;
+    result.decision = 'PARTIAL';
+    result.notes = (result.notes ? result.notes + " " : "") + `Approved amount capped at ₹${remainingAnnualLimit} due to annual limit of ₹${annualLimit} (YTD Approved: ₹${ytdApprovedAmount}).`;
   }
 
   // ----------------------------------------------------

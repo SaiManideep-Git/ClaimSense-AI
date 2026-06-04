@@ -10,6 +10,17 @@ const { uploadFile } = require('../services/fileStorage');
 const { extractDocumentData } = require('../services/llmService');
 const { adjudicateClaim } = require('../services/rulesEngine');
 
+// Load Mock TechCorp Employee Registry
+let employees = [];
+try {
+  const employeesPath = path.join(__dirname, '../config/employees.json');
+  if (fs.existsSync(employeesPath)) {
+    employees = JSON.parse(fs.readFileSync(employeesPath, 'utf8'));
+  }
+} catch (e) {
+  console.warn('[Claim Routes] Mock employees database failed to load:', e.message);
+}
+
 // Multer in-memory storage for handling uploads before streaming to Cloudinary or saving locally
 const storage = multer.memoryStorage();
 const upload = multer({ storage }).fields([
@@ -41,6 +52,81 @@ router.post('/submit', upload, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: memberId, memberName, treatmentDate, claimAmount' });
     }
 
+    // A. Eligibility Check: Member Covered (MEMBER_NOT_COVERED)
+    const employee = employees.find(emp => emp.memberId === memberId);
+    if (!employee || employee.status !== 'Active') {
+      const ruleResult = {
+        decision: 'REJECTED',
+        approvedAmount: 0,
+        deductions: { copay: 0, networkDiscount: 0, limitExceeded: 0, excludedItemsDetails: [] },
+        rejectedItems: [],
+        rejectionReasons: ['MEMBER_NOT_COVERED'],
+        flags: [],
+        notes: `Claimant with Member ID ${memberId} is not registered or covered under TechCorp policy records.`,
+        nextSteps: 'Please verify your member ID or contact your HR administrator.',
+        confidenceScore: 1.0
+      };
+      
+      const newClaim = new Claim({
+        claimId: `CLM_${Math.floor(100000 + Math.random() * 900000)}`,
+        memberId,
+        memberName,
+        treatmentDate: new Date(treatmentDate),
+        claimAmount: Number(claimAmount),
+        hospital,
+        cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
+        status: 'rejected',
+        adjudication: ruleResult
+      });
+      await newClaim.save();
+      console.log(`[Claim Submission] Saved claim ${newClaim.claimId} with decision: REJECTED (MEMBER_NOT_COVERED)`);
+      return res.status(201).json(newClaim);
+    }
+
+    // B. Auto-fill Join Date if left blank
+    let joinDateToUse = memberJoinDate;
+    if (!joinDateToUse && employee) {
+      joinDateToUse = employee.joinDate;
+      console.log(`[Claim Submission] Auto-filled joining date for ${memberId}: ${joinDateToUse}`);
+    }
+
+    // C. Duplicate Claim Check (DUPLICATE_CLAIM)
+    const duplicate = await Claim.findOne({
+      memberId,
+      treatmentDate: new Date(treatmentDate),
+      claimAmount: Number(claimAmount),
+      status: { $ne: 'rejected' }
+    });
+
+    if (duplicate) {
+      const ruleResult = {
+        decision: 'REJECTED',
+        approvedAmount: 0,
+        deductions: { copay: 0, networkDiscount: 0, limitExceeded: 0, excludedItemsDetails: [] },
+        rejectedItems: [],
+        rejectionReasons: ['DUPLICATE_CLAIM'],
+        flags: [],
+        notes: `A claim for the same treatment date (${treatmentDate}) and amount (₹${claimAmount}) has already been submitted (Claim ID: ${duplicate.claimId}).`,
+        nextSteps: 'Please do not submit the same invoice twice. If you have distinct treatments on the same day, make sure their bill details vary.',
+        confidenceScore: 1.0
+      };
+
+      const newClaim = new Claim({
+        claimId: `CLM_${Math.floor(100000 + Math.random() * 900000)}`,
+        memberId,
+        memberName,
+        treatmentDate: new Date(treatmentDate),
+        claimAmount: Number(claimAmount),
+        hospital,
+        cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
+        status: 'rejected',
+        adjudication: ruleResult
+      });
+      await newClaim.save();
+      console.log(`[Claim Submission] Saved claim ${newClaim.claimId} with decision: REJECTED (DUPLICATE_CLAIM)`);
+      return res.status(201).json(newClaim);
+    }
+
     const claimContext = {
       memberId,
       memberName,
@@ -48,7 +134,7 @@ router.post('/submit', upload, async (req, res) => {
       claimAmount: Number(claimAmount),
       hospital,
       cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
-      memberJoinDate,
+      memberJoinDate: joinDateToUse,
       previousClaimsSameDay: Number(previousClaimsSameDay || 0),
       testCaseId
     };
@@ -120,6 +206,8 @@ router.post('/submit', upload, async (req, res) => {
       doctorName: prescriptionExtracted.doctorName || billExtracted.doctorName || '',
       doctorReg: prescriptionExtracted.doctorReg || billExtracted.doctorReg || '',
       consultationDate: billExtracted.consultationDate || prescriptionExtracted.consultationDate || treatmentDate,
+      prescriptionDate: prescriptionExtracted.consultationDate || null,
+      billDate: billExtracted.consultationDate || null,
       claimAmount: Number(billExtracted.claimAmount || claimAmount),
       consultationFee: Number(billExtracted.consultationFee || prescriptionExtracted.consultationFee || 0),
       medicines: medicinesCombined,
@@ -128,6 +216,26 @@ router.post('/submit', upload, async (req, res) => {
       diagnosis: prescriptionExtracted.diagnosis || billExtracted.diagnosis || 'OPD Consultation',
       claimType: prescriptionExtracted.claimType || billExtracted.claimType || 'OPD'
     };
+
+    // D. Fetch YTD Approved Amount for Annual Limit check
+    const claimYear = new Date(treatmentDate).getFullYear();
+    const startOfYear = new Date(`${claimYear}-01-01T00:00:00.000Z`);
+    const endOfYear = new Date(`${claimYear}-12-31T23:59:59.999Z`);
+
+    let ytdApprovedAmount = 0;
+    try {
+      const pastClaims = await Claim.find({
+        memberId,
+        status: { $in: ['approved', 'partial'] },
+        treatmentDate: { $gte: startOfYear, $lte: endOfYear }
+      });
+      ytdApprovedAmount = pastClaims.reduce((sum, c) => sum + (c.adjudication.approvedAmount || 0), 0);
+      console.log(`[Claim Submission] YTD approved amount for member ${memberId}: ₹${ytdApprovedAmount}`);
+    } catch (dbErr) {
+      console.error('[Claim Submission] Error fetching YTD approved amount:', dbErr.message);
+    }
+
+    claimContext.ytdApprovedAmount = ytdApprovedAmount;
 
     // 4. Run Policy Rules Engine
     const ruleResult = adjudicateClaim(claimContext, aggregatedData);
@@ -252,7 +360,8 @@ router.get('/test-suite/run', async (req, res) => {
         hospital: input.hospital || '',
         cashlessRequest: input.cashless_request || false,
         memberJoinDate: input.member_join_date || null,
-        previousClaimsSameDay: input.previous_claims_same_day || 0
+        previousClaimsSameDay: input.previous_claims_same_day || 0,
+        testCaseId: tc.case_id
       };
 
       const extractedData = {

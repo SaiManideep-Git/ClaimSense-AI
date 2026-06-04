@@ -1,0 +1,12 @@
+[
+  { "memberId": "EMP001", "memberName": "Rajesh Kumar", "joinDate": "2024-01-15", "status": "Active" },
+  { "memberId": "EMP002", "memberName": "Priya Singh", "joinDate": "2024-02-10", "status": "Active" },
+  { "memberId": "EMP003", "memberName": "Amit Verma", "joinDate": "2024-03-01", "status": "Active" },
+  { "memberId": "EMP004", "memberName": "Sneha Reddy", "joinDate": "2024-04-01", "status": "Active" },
+  { "memberId": "EMP005", "memberName": "Vikram Joshi", "joinDate": "2024-09-01", "status": "Active" },
+  { "memberId": "EMP006", "memberName": "Kavita Nair", "joinDate": "2024-05-15", "status": "Active" },
+  { "memberId": "EMP007", "memberName": "Suresh Patil", "joinDate": "2024-06-20", "status": "Active" },
+  { "memberId": "EMP008", "memberName": "Ravi Menon", "joinDate": "2024-07-01", "status": "Active" },
+  { "memberId": "EMP009", "memberName": "Anita Desai", "joinDate": "2024-01-01", "status": "Active" },
+  { "memberId": "EMP010", "memberName": "Deepak Shah", "joinDate": "2024-08-15", "status": "Active" }
+]
