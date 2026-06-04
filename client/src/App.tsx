@@ -29,6 +29,251 @@ interface Claim {
   createdAt: string;
 }
 
+// Dynamic document canvas builder for pre-defined test cases
+const createCanvasDocument = (
+  type: 'prescription' | 'bill',
+  tcId: string,
+  tc: any
+): Promise<File> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 800;
+    const ctx = canvas.getContext('2d');
+    const input = tc.input_data;
+    
+    if (!ctx) {
+      resolve(new File([new Blob(['Empty file'], { type: 'image/png' })], `${tcId}_${type}.png`, { type: 'image/png' }));
+      return;
+    }
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Decorative Borders
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+
+    // Date
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 12px Courier New';
+    ctx.fillText(`Date: ${input.treatment_date}`, 440, 50);
+
+    if (type === 'prescription') {
+      const doc = input.documents?.prescription || {};
+      
+      // Header: Clinic/Doctor
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText(doc.doctor_name || 'Dr. Medical Practitioner', 50, 80);
+      
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 12px Arial';
+      ctx.fillText(`Reg No: ${doc.doctor_reg || 'REG-123456'}`, 50, 105);
+      ctx.fillText('General Medicine & Diagnostics Clinic', 50, 120);
+
+      // Line separator
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(40, 140);
+      ctx.lineTo(560, 140);
+      ctx.stroke();
+
+      // Patient Details
+      ctx.fillStyle = '#1e293b';
+      ctx.font = '14px Arial';
+      ctx.fillText(`Patient Name :  ${input.member_name}`, 55, 175);
+      ctx.fillText(`Member ID    :  ${input.member_id}`, 55, 195);
+      
+      // Rx Symbol
+      ctx.fillStyle = '#0284c7';
+      ctx.font = 'bold 42px Georgia';
+      ctx.fillText('Rx', 55, 265);
+
+      // Diagnosis
+      ctx.fillStyle = '#334155';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(`Diagnosis:  ${doc.diagnosis || 'General Consultation'}`, 55, 305);
+
+      // Prescriptions Content
+      let y = 350;
+      
+      if (doc.medicines_prescribed && doc.medicines_prescribed.length > 0) {
+        ctx.fillStyle = '#0284c7';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Prescribed Medicines:', 55, y);
+        y += 25;
+        
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '14px Courier New';
+        doc.medicines_prescribed.forEach((med: string, i: number) => {
+          ctx.fillText(`${i + 1}. ${med} -- (1-0-1) x 5 days`, 70, y);
+          y += 22;
+        });
+        y += 20;
+      }
+
+      if (doc.tests_prescribed && doc.tests_prescribed.length > 0) {
+        ctx.fillStyle = '#0284c7';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Advised Diagnostic Tests:', 55, y);
+        y += 25;
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '14px Courier New';
+        doc.tests_prescribed.forEach((test: string) => {
+          ctx.fillText(`* ${test}`, 70, y);
+          y += 22;
+        });
+        y += 20;
+      }
+
+      if (doc.procedures && doc.procedures.length > 0) {
+        ctx.fillStyle = '#0284c7';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Advised Procedures:', 55, y);
+        y += 25;
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '14px Courier New';
+        doc.procedures.forEach((proc: string) => {
+          ctx.fillText(`- ${proc}`, 70, y);
+          y += 22;
+        });
+        y += 20;
+      }
+
+      if (doc.treatment) {
+        ctx.fillStyle = '#0284c7';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Treatment Plan:', 55, y);
+        y += 25;
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '14px Courier New';
+        ctx.fillText(`- ${doc.treatment}`, 70, y);
+        y += 20;
+      }
+
+      // Footer signature
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'italic 12px Arial';
+      ctx.fillText('Digitally Signed by Medical Practitioner', 330, 710);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(330, 700);
+      ctx.lineTo(540, 700);
+      ctx.stroke();
+
+    } else {
+      // Bill/Invoice Generation
+      const bill = input.documents?.bill || {};
+
+      // Header: Hospital / Invoice
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 22px Arial';
+      ctx.fillText(input.hospital || 'Care Clinic & General Hospital', 50, 80);
+      
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 12px Arial';
+      ctx.fillText('Tax Invoice / Bill Statement', 50, 105);
+
+      // Line separator
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(40, 130);
+      ctx.lineTo(560, 130);
+      ctx.stroke();
+
+      // Bill Info
+      ctx.fillStyle = '#1e293b';
+      ctx.font = '14px Arial';
+      ctx.fillText(`Patient Name :  ${input.member_name}`, 55, 160);
+      ctx.fillText(`Member ID    :  ${input.member_id}`, 55, 180);
+      ctx.fillText(`Invoice No   :  INV-${Math.floor(100000 + Math.random() * 900000)}`, 55, 200);
+
+      // Table Headers
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(50, 230, 500, 30);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(50, 230, 500, 30);
+
+      ctx.fillStyle = '#334155';
+      ctx.font = 'bold 12px Arial';
+      ctx.fillText('Line Item / Description', 65, 250);
+      ctx.fillText('Amount (INR)', 440, 250);
+
+      // Table Rows
+      ctx.font = '13px Courier New';
+      ctx.fillStyle = '#0f172a';
+      let y = 295;
+      let totalAmount = 0;
+
+      // Check fields and write rows dynamically
+      Object.keys(bill).forEach((key) => {
+        const val = bill[key];
+        if (typeof val === 'number') {
+          const desc = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          ctx.fillText(desc, 65, y);
+          ctx.fillText(`Rs. ${val.toFixed(2)}`, 440, y);
+          totalAmount += val;
+          y += 35;
+        } else if (Array.isArray(val)) {
+          val.forEach((item) => {
+            const itemCost = 250; 
+            ctx.fillText(item, 65, y);
+            ctx.fillText(`Rs. ${itemCost.toFixed(2)}`, 440, y);
+            totalAmount += itemCost;
+            y += 35;
+          });
+        }
+      });
+
+      // Draw consultation fee if prescription has diagnostic tests and not in bill
+      if (totalAmount === 0) {
+        ctx.fillText('OPD Consultation Fee', 65, y);
+        ctx.fillText(`Rs. ${input.claim_amount.toFixed(2)}`, 440, y);
+        totalAmount = input.claim_amount;
+        y += 35;
+      }
+
+      // Draw lines
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(50, y - 15);
+      ctx.lineTo(550, y - 15);
+      ctx.stroke();
+
+      // Total Row
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText('Total Billed Amount:', 65, y + 10);
+      ctx.fillText(`Rs. ${totalAmount.toFixed(2)}`, 435, y + 10);
+
+      // Footer terms
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px Arial';
+      ctx.fillText('Thank you for choosing our healthcare facility.', 50, 720);
+      ctx.fillText('This is a computer generated invoice and requires no physical signature.', 50, 735);
+    }
+
+    // Convert canvas to Blob PNG
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(new File([blob], `${tcId}_${type}.png`, { type: 'image/png' }));
+      } else {
+        resolve(new File([new Blob(['Empty'], { type: 'image/png' })], `${tcId}_${type}.png`, { type: 'image/png' }));
+      }
+    }, 'image/png');
+  });
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'submit' | 'history' | 'testsuite' | 'policy'>('submit');
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -93,7 +338,7 @@ export default function App() {
   }, [activeTab]);
 
   // Pre-fill form from test cases definition
-  const handleTestCaseSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleTestCaseSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
     setTestCaseId(id);
     if (!id) return;
@@ -111,12 +356,20 @@ export default function App() {
         setMemberJoinDate(input.member_join_date || '');
         setPreviousClaimsSameDay(String(input.previous_claims_same_day || 0));
 
-        // Create virtual dummy files for mock extraction matching original names
-        const mockPrescriptionContent = new Blob(['Prescription Details for ' + input.member_name], { type: 'text/plain' });
-        const mockBillContent = new Blob(['Bill Details for ' + input.member_name], { type: 'text/plain' });
-        
-        setPrescriptionFile(new File([mockPrescriptionContent], `${id}_Prescription.png`, { type: 'image/png' }));
-        setBillFile(new File([mockBillContent], `${id}_Bill.png`, { type: 'image/png' }));
+        // Generate real image files dynamically using canvas to allow real OCR
+        if (input.documents?.prescription) {
+          const presFile = await createCanvasDocument('prescription', id, tc);
+          setPrescriptionFile(presFile);
+        } else {
+          setPrescriptionFile(null);
+        }
+
+        if (input.documents?.bill) {
+          const billFile = await createCanvasDocument('bill', id, tc);
+          setBillFile(billFile);
+        } else {
+          setBillFile(null);
+        }
       }
     } catch (err) {
       console.error('Failed to parse local test case details:', err);
