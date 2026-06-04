@@ -182,6 +182,27 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     return result;
   }
 
+  // Illegible documents check
+  if (extractedData && !extractedData.patientName && !extractedData.doctorName && !extractedData.diagnosis && !extractedData.claimAmount) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('ILLEGIBLE_DOCUMENTS');
+    result.notes = 'The submitted medical documents are illegible, blank, or could not be read by the AI OCR engine.';
+    return result;
+  }
+
+  // Invalid prescription check (e.g. blank content)
+  if (hasPrescription && extractedData) {
+    const medicines = extractedData.medicines || [];
+    const tests = extractedData.tests || [];
+    const procedures = extractedData.procedures || [];
+    if (medicines.length === 0 && tests.length === 0 && procedures.length === 0) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('INVALID_PRESCRIPTION');
+      result.notes = 'The prescription is invalid because it contains no prescribed medicines, diagnostic tests, or clinical procedures.';
+      return result;
+    }
+  }
+
   // Doctor registration validation
   const doctorReg = extractedData?.doctorReg || '';
   if (doctorReg) {
@@ -263,6 +284,17 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     result.decision = 'REJECTED';
     result.rejectionReasons.push('EXCLUDED_CONDITION');
     result.notes = 'Vitamins and supplements are excluded from coverage unless prescribed for a specific deficiency.';
+    return result;
+  }
+
+  // Experimental exclusions check (EXPERIMENTAL_TREATMENT)
+  const hasExperimental = containsKeyword(extractedData?.procedures, ['experimental', 'clinical trial', 'investigational', 'unproven', 'stem cell therapy']) ||
+                          containsKeyword(extractedData?.tests, ['experimental', 'investigational']) ||
+                          diagnosis.includes('experimental');
+  if (hasExperimental) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('EXPERIMENTAL_TREATMENT');
+    result.notes = 'Experimental or unproven treatments are excluded from coverage.';
     return result;
   }
   // ----------------------------------------------------
@@ -421,12 +453,22 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     return result;
   }
 
+  let eligibleBaseAmount = claimAmount;
+
+  // Check sub-limit for specific categories (Dental / Vision / Alternative)
+  if (claimCategory !== 'OPD' && claimAmount > categoryLimit) {
+    const limitExcess = claimAmount - categoryLimit;
+    result.deductions.limitExceeded = limitExcess;
+    eligibleBaseAmount = categoryLimit;
+    result.decision = 'PARTIAL';
+    result.rejectionReasons.push('SUB_LIMIT_EXCEEDED');
+    result.notes = `Claim amount ₹${claimAmount} exceeds the ${claimCategory} category sub-limit of ₹${categoryLimit}. Approved amount capped.`;
+  }
+
   // ----------------------------------------------------
   // STEP 5: Calculate Deductions (Partial / Network / Copay)
   // ----------------------------------------------------
   
-  let eligibleBaseAmount = claimAmount;
-
   // Handle itemized rejections (e.g. Dental with root canal + teeth whitening)
   if (claimCategory === 'Dental') {
     const whiteningProcedure = extractedData?.procedures?.find(p => p.toLowerCase().includes('whitening') || p.toLowerCase().includes('bleaching'));
