@@ -33,8 +33,7 @@ router.post('/submit', upload, async (req, res) => {
       hospital,
       cashlessRequest,
       memberJoinDate,
-      previousClaimsSameDay,
-      testCaseId // If testing specific mock inputs
+      previousClaimsSameDay
     } = req.body;
 
     // Validate base inputs
@@ -128,8 +127,7 @@ router.post('/submit', upload, async (req, res) => {
       hospital,
       cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
       memberJoinDate: joinDateToUse,
-      previousClaimsSameDay: Number(previousClaimsSameDay || 0),
-      testCaseId
+      previousClaimsSameDay: Number(previousClaimsSameDay || 0)
     };
 
     console.log(`[Claim Submission] Processing claim for ${memberName} (${memberId}), amount: ₹${claimAmount}`);
@@ -319,116 +317,7 @@ router.post('/:id/appeal', async (req, res) => {
   }
 });
 
-/**
- * @route   POST /api/test-suite
- * @desc    Execute pre-defined test cases against the rules engine and return comparisons
- */
-router.get('/test-suite/run', async (req, res) => {
-  try {
-    let testCasesPath = path.join(__dirname, '../../plum_intern_assignment/test_cases.json');
-    if (!fs.existsSync(testCasesPath)) {
-      testCasesPath = path.join(__dirname, '../test_cases.json');
-    }
-    if (!fs.existsSync(testCasesPath)) {
-      testCasesPath = path.join(__dirname, 'test_cases.json');
-    }
-    const testCasesData = JSON.parse(fs.readFileSync(testCasesPath, 'utf8'));
-    
-    const results = [];
-    let passedCount = 0;
-
-    for (const tc of testCasesData.test_cases) {
-      const startTime = process.hrtime();
-      
-      // Simulate aggregated extracted data from case prescription and bill
-      const input = tc.input_data;
-      const prescription = input.documents?.prescription || {};
-      const bill = input.documents?.bill || {};
-
-      const claimContext = {
-        memberId: input.member_id,
-        memberName: input.member_name,
-        treatmentDate: input.treatment_date,
-        claimAmount: input.claim_amount,
-        hospital: input.hospital || '',
-        cashlessRequest: input.cashless_request || false,
-        memberJoinDate: input.member_join_date || null,
-        previousClaimsSameDay: input.previous_claims_same_day || 0,
-        testCaseId: tc.case_id
-      };
-
-      const extractedData = {
-        patientName: input.member_name,
-        hospitalName: input.hospital || "",
-        doctorName: prescription.doctor_name || "",
-        doctorReg: prescription.doctor_reg || "",
-        consultationDate: input.treatment_date,
-        claimAmount: input.claim_amount,
-        consultationFee: bill.consultation_fee || 0,
-        medicines: prescription.medicines_prescribed || [],
-        tests: prescription.tests_prescribed || bill.test_names || [],
-        procedures: prescription.procedures || (prescription.treatment ? [prescription.treatment] : []),
-        diagnosis: prescription.diagnosis || '',
-        claimType: prescription.procedures ? 'Dental' : (prescription.treatment ? 'Alternative' : 'OPD')
-      };
-
-      // Run rules engine
-      const engineResult = adjudicateClaim(claimContext, extractedData);
-
-      const endTime = process.hrtime(startTime);
-      const elapsedMs = (endTime[0] * 1000 + endTime[1] / 1000000).toFixed(2);
-
-      // Verify alignment with expected output
-      const expected = tc.expected_output;
-      
-      let isDecisionMatch = engineResult.decision === expected.decision;
-      let isAmountMatch = true;
-
-      if (expected.decision === 'APPROVED' || expected.decision === 'PARTIAL') {
-        // Allow minor float differences
-        isAmountMatch = Math.abs(engineResult.approvedAmount - expected.approved_amount) < 2;
-      }
-
-      // Check rejection reason if rejected
-      let isReasonMatch = true;
-      if (expected.decision === 'REJECTED' && expected.rejection_reasons) {
-        isReasonMatch = expected.rejection_reasons.some(r => engineResult.rejectionReasons.includes(r));
-      }
-
-      const passed = isDecisionMatch && isAmountMatch && isReasonMatch;
-      if (passed) passedCount++;
-
-      results.push({
-        caseId: tc.case_id,
-        caseName: tc.case_name,
-        description: tc.description,
-        input: tc.input_data,
-        expected: expected,
-        actual: {
-          decision: engineResult.decision,
-          approvedAmount: engineResult.approvedAmount,
-          deductions: engineResult.deductions,
-          rejectionReasons: engineResult.rejectionReasons,
-          notes: engineResult.notes
-        },
-        passed,
-        elapsedMs
-      });
-    }
-
-    res.json({
-      summary: {
-        totalCases: testCasesData.test_cases.length,
-        passedCases: passedCount,
-        failedCases: testCasesData.test_cases.length - passedCount,
-        accuracyPercentage: ((passedCount / testCasesData.test_cases.length) * 100).toFixed(2)
-      },
-      results
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to run test suite', details: err.message });
-  }
-});
+// Test suite run endpoint disabled per user request
 
 /**
  * @route   GET /api/claims/employee/:memberId

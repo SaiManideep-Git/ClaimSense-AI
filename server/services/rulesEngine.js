@@ -100,19 +100,16 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   }
 
   // Timeline filing check (LATE_SUBMISSION)
-  const isTestCase = !!(claim.testCaseId || (claim.memberName && claim.memberName.includes('TC')) || (extractedData?.patientName && extractedData.patientName.includes('TC')));
-  if (!isTestCase) {
-    const submissionTimeline = policy.claim_requirements?.submission_timeline_days || 30;
-    const now = new Date();
-    const treatDateOnly = new Date(treatmentDate.getFullYear(), treatmentDate.getMonth(), treatmentDate.getDate());
-    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const submissionDiffDays = Math.floor((nowDateOnly - treatDateOnly) / (1000 * 60 * 60 * 24));
-    if (submissionDiffDays > submissionTimeline) {
-      result.decision = 'REJECTED';
-      result.rejectionReasons.push('LATE_SUBMISSION');
-      result.notes = `Claim was submitted ${submissionDiffDays} days after treatment. Policy requires submission within ${submissionTimeline} days.`;
-      return result;
-    }
+  const submissionTimeline = policy.claim_requirements?.submission_timeline_days || 30;
+  const now = new Date();
+  const treatDateOnly = new Date(treatmentDate.getFullYear(), treatmentDate.getMonth(), treatmentDate.getDate());
+  const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const submissionDiffDays = Math.floor((nowDateOnly - treatDateOnly) / (1000 * 60 * 60 * 24));
+  if (submissionDiffDays > submissionTimeline) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('LATE_SUBMISSION');
+    result.notes = `Claim was submitted ${submissionDiffDays} days after treatment. Policy requires submission within ${submissionTimeline} days.`;
+    return result;
   }
 
   // Member verification

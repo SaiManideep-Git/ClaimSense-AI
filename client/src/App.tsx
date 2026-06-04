@@ -4,7 +4,7 @@ import { PolicyViewer } from './components/PolicyViewer';
 
 import { ClaimDetailsModal } from './components/ClaimDetailsModal';
 
-import testCasesData from './test_cases.json';
+// Test cases data import removed
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -29,273 +29,7 @@ interface Claim {
   createdAt: string;
 }
 
-// Dynamic document canvas builder for pre-defined test cases
-const createCanvasDocument = (
-  type: 'prescription' | 'bill',
-  tcId: string,
-  tc: any
-): Promise<File> => {
-  return new Promise((resolve) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 800;
-    const ctx = canvas.getContext('2d');
-    const input = tc.input_data;
-    
-    if (!ctx) {
-      resolve(new File([new Blob(['Empty file'], { type: 'image/png' })], `${tcId}_${type}.png`, { type: 'image/png' }));
-      return;
-    }
-
-    // Background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Decorative Borders
-    ctx.strokeStyle = '#0284c7';
-    ctx.lineWidth = 10;
-    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-
-    // Date
-    ctx.fillStyle = '#475569';
-    ctx.font = 'bold 12px Courier New';
-    ctx.fillText(`Date: ${input.treatment_date}`, 440, 50);
-
-    if (type === 'prescription') {
-      const doc = input.documents?.prescription || {};
-      
-      // Header: Clinic/Doctor
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 22px Arial';
-      ctx.fillText(doc.doctor_name || 'Dr. Medical Practitioner', 50, 80);
-      
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText(`Reg No: ${doc.doctor_reg || 'REG-123456'}`, 50, 105);
-      ctx.fillText('General Medicine & Diagnostics Clinic', 50, 120);
-
-      // Line separator
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(40, 140);
-      ctx.lineTo(560, 140);
-      ctx.stroke();
-
-      // Patient Details
-      ctx.fillStyle = '#1e293b';
-      ctx.font = '14px Arial';
-      ctx.fillText(`Patient Name :  ${input.member_name}`, 55, 175);
-      ctx.fillText(`Member ID    :  ${input.member_id}`, 55, 195);
-      
-      // Rx Symbol
-      ctx.fillStyle = '#0284c7';
-      ctx.font = 'bold 42px Georgia';
-      ctx.fillText('Rx', 55, 265);
-
-      // Diagnosis
-      ctx.fillStyle = '#334155';
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(`Diagnosis:  ${doc.diagnosis || 'General Consultation'}`, 55, 305);
-
-      // Prescriptions Content
-      let y = 350;
-      
-      if (doc.medicines_prescribed && doc.medicines_prescribed.length > 0) {
-        ctx.fillStyle = '#0284c7';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('Prescribed Medicines:', 55, y);
-        y += 25;
-        
-        ctx.fillStyle = '#0f172a';
-        ctx.font = '14px Courier New';
-        doc.medicines_prescribed.forEach((med: string, i: number) => {
-          ctx.fillText(`${i + 1}. ${med} -- (1-0-1) x 5 days`, 70, y);
-          y += 22;
-        });
-        y += 20;
-      }
-
-      if (doc.tests_prescribed && doc.tests_prescribed.length > 0) {
-        ctx.fillStyle = '#0284c7';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('Advised Diagnostic Tests:', 55, y);
-        y += 25;
-
-        ctx.fillStyle = '#0f172a';
-        ctx.font = '14px Courier New';
-        doc.tests_prescribed.forEach((test: string) => {
-          ctx.fillText(`* ${test}`, 70, y);
-          y += 22;
-        });
-        y += 20;
-      }
-
-      if (doc.procedures && doc.procedures.length > 0) {
-        ctx.fillStyle = '#0284c7';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('Advised Procedures:', 55, y);
-        y += 25;
-
-        ctx.fillStyle = '#0f172a';
-        ctx.font = '14px Courier New';
-        doc.procedures.forEach((proc: string) => {
-          ctx.fillText(`- ${proc}`, 70, y);
-          y += 22;
-        });
-        y += 20;
-      }
-
-      if (doc.treatment) {
-        ctx.fillStyle = '#0284c7';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('Treatment Plan:', 55, y);
-        y += 25;
-
-        ctx.fillStyle = '#0f172a';
-        ctx.font = '14px Courier New';
-        ctx.fillText(`- ${doc.treatment}`, 70, y);
-        y += 20;
-      }
-
-      // Footer signature
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'italic 12px Arial';
-      ctx.fillText('Digitally Signed by Medical Practitioner', 330, 710);
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(330, 700);
-      ctx.lineTo(540, 700);
-      ctx.stroke();
-
-    } else {
-      // Bill/Invoice Generation
-      const bill = input.documents?.bill || {};
-
-      // Header: Hospital / Invoice
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 22px Arial';
-      ctx.fillText(input.hospital || 'Care Clinic & General Hospital', 50, 80);
-      
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText('Tax Invoice / Bill Statement', 50, 105);
-
-      // Line separator
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(40, 130);
-      ctx.lineTo(560, 130);
-      ctx.stroke();
-
-      // Bill Info
-      ctx.fillStyle = '#1e293b';
-      ctx.font = '14px Arial';
-      ctx.fillText(`Patient Name :  ${input.member_name}`, 55, 160);
-      ctx.fillText(`Member ID    :  ${input.member_id}`, 55, 180);
-      ctx.fillText(`Invoice No   :  INV-${Math.floor(100000 + Math.random() * 900000)}`, 55, 200);
-
-      // Table Headers
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(50, 230, 500, 30);
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(50, 230, 500, 30);
-
-      ctx.fillStyle = '#334155';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText('Line Item / Description', 65, 250);
-      ctx.fillText('Amount (INR)', 440, 250);
-
-      // Table Rows
-      ctx.font = '13px Courier New';
-      ctx.fillStyle = '#0f172a';
-      let y = 295;
-      let totalAmount = 0;
-
-      // Check fields and write rows dynamically
-      Object.keys(bill).forEach((key) => {
-        const val = bill[key];
-        if (typeof val === 'number') {
-          const desc = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-          ctx.fillText(desc, 65, y);
-          ctx.fillText(`Rs. ${val.toFixed(2)}`, 440, y);
-          totalAmount += val;
-          y += 35;
-        } else if (Array.isArray(val)) {
-          val.forEach((item) => {
-            const itemCost = 250; 
-            ctx.fillText(item, 65, y);
-            ctx.fillText(`Rs. ${itemCost.toFixed(2)}`, 440, y);
-            totalAmount += itemCost;
-            y += 35;
-          });
-        }
-      });
-
-      // Draw consultation fee if prescription has diagnostic tests and not in bill
-      if (totalAmount === 0) {
-        ctx.fillText('OPD Consultation Fee', 65, y);
-        ctx.fillText(`Rs. ${input.claim_amount.toFixed(2)}`, 440, y);
-        totalAmount = input.claim_amount;
-        y += 35;
-      }
-
-      // Draw lines
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.beginPath();
-      ctx.moveTo(50, y - 15);
-      ctx.lineTo(550, y - 15);
-      ctx.stroke();
-
-      // Total Row
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText('Total Billed Amount:', 65, y + 10);
-      ctx.fillText(`Rs. ${totalAmount.toFixed(2)}`, 435, y + 10);
-
-      // Footer terms
-      ctx.fillStyle = '#64748b';
-      ctx.font = '10px Arial';
-      ctx.fillText('Thank you for choosing our healthcare facility.', 50, 720);
-      ctx.fillText('This is a computer generated invoice and requires no physical signature.', 50, 735);
-    }
-
-    // Convert canvas to Blob PNG
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(new File([blob], `${tcId}_${type}.png`, { type: 'image/png' }));
-      } else {
-        resolve(new File([new Blob(['Empty'], { type: 'image/png' })], `${tcId}_${type}.png`, { type: 'image/png' }));
-      }
-    }, 'image/png');
-  });
-};
-
-// Fetch pre-generated high-fidelity PNG documents from server/public samples
-const fetchSampleDocument = async (
-  type: 'prescription' | 'bill',
-  tcId: string,
-  tc: any
-): Promise<File> => {
-  const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
-  const filename = `${tcId}_${capitalizedType}.png`;
-  const url = `/samples/${filename}`;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch static sample ${filename}: ${response.statusText}`);
-    }
-    const blob = await response.blob();
-    return new File([blob], filename, { type: 'image/png' });
-  } catch (err) {
-    console.warn(`Failed to fetch static sample ${filename}, falling back to canvas generation:`, err);
-    return createCanvasDocument(type, tcId, tc);
-  }
-};
-
+// Canvas test case helpers removed per user request
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'submit' | 'history' | 'policy'>('submit');
@@ -313,7 +47,6 @@ export default function App() {
   const [previousClaimsSameDay, setPreviousClaimsSameDay] = useState('0');
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [billFile, setBillFile] = useState<File | null>(null);
-  const [testCaseId, setTestCaseId] = useState('');
 
   // Employee DB verification state
   const [employeeDetails, setEmployeeDetails] = useState<any>(null);
@@ -408,46 +141,7 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // Pre-fill form from test cases definition
-  const handleTestCaseSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
-    setTestCaseId(id);
-    if (!id) return;
-
-    try {
-      const tc = testCasesData.test_cases.find((r: any) => r.case_id === id);
-      if (tc) {
-        const input = tc.input_data;
-        setMemberId(input.member_id);
-        setMemberName(input.member_name);
-        setTreatmentDate(input.treatment_date);
-        setClaimAmount(String(input.claim_amount));
-        setHospital(input.hospital || 'Care Clinic');
-        setCashlessRequest(!!input.cashless_request);
-        setMemberJoinDate(input.member_join_date || '');
-        setPreviousClaimsSameDay(String(input.previous_claims_same_day || 0));
-
-        // Fetch pre-generated high-fidelity PNG files
-        if (input.documents?.prescription) {
-          const presFile = await fetchSampleDocument('prescription', id, tc);
-          setPrescriptionFile(presFile);
-        } else {
-          setPrescriptionFile(null);
-        }
-
-        if (input.documents?.bill) {
-          const billFile = await fetchSampleDocument('bill', id, tc);
-          setBillFile(billFile);
-        } else {
-          setBillFile(null);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to parse local test case details:', err);
-    }
-  };
-
-  const resetForm = () => {
+    const resetForm = () => {
     setMemberId('EMP001');
     setMemberName('');
     setTreatmentDate('');
@@ -458,8 +152,7 @@ export default function App() {
     setPreviousClaimsSameDay('0');
     setPrescriptionFile(null);
     setBillFile(null);
-    setTestCaseId('');
-    setCreatedClaim(null);
+        setCreatedClaim(null);
     setEmployeeDetails(null);
     setPolicyDetails(null);
     setYtdApprovedAmount(0);
@@ -516,9 +209,7 @@ export default function App() {
       formData.append('cashlessRequest', String(cashlessRequest));
       formData.append('memberJoinDate', memberJoinDate);
       formData.append('previousClaimsSameDay', previousClaimsSameDay);
-      formData.append('testCaseId', testCaseId);
-
-      if (prescriptionFile) {
+            if (prescriptionFile) {
         formData.append('prescription', prescriptionFile);
       }
       if (billFile) {
@@ -643,28 +334,7 @@ export default function App() {
                     <p className="text-xs text-slate-400 mt-1">Provide claim details and upload medical files.</p>
                   </div>
 
-                  {/* Test Cases Filler Selection */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Test Scenario Fill:</span>
-                    <select
-                      onChange={handleTestCaseSelect}
-                      value={testCaseId}
-                      className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-brand-500 cursor-pointer"
-                    >
-                      <option value="">-- Select Test Case --</option>
-                      <option value="TC001">TC001: Simple Approved Consultation (Fever)</option>
-                      <option value="TC002">TC002: Dental Partial Approval (Cosmetic Whitening)</option>
-                      <option value="TC003">TC003: Claim Limit Exceeded (Rejected)</option>
-                      <option value="TC004">TC004: Missing Prescription (Rejected)</option>
-                      <option value="TC005">TC005: Pre-existing Disease Waiting Period (Rejected)</option>
-                      <option value="TC006">TC006: Alternative Medicine Ayurvedic (Approved)</option>
-                      <option value="TC007">TC007: MRI Scan Pre-auth Missing (Rejected)</option>
-                      <option value="TC008">TC008: Multiple Daily Claims Fraud (Manual Review)</option>
-                      <option value="TC009">TC009: Excluded Obesity Diet Treatment (Rejected)</option>
-                      <option value="TC010">TC010: Network Hospital Discount Cashless (Approved)</option>
-                    </select>
-                  </div>
-                </div>
+                                  </div>
 
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   
