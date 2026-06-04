@@ -69,7 +69,7 @@ export default function App() {
       setIsFetchingEmployee(true);
       setEmployeeFetchError('');
       try {
-        const response = await fetch(`${API_URL}/api/claims/employee/${memberId}`);
+        const response = await fetch(`${API_URL}/api/claims/employee/${memberId}?treatmentDate=${treatmentDate}`);
         if (!response.ok) {
           throw new Error('Member ID not found in corporate records.');
         }
@@ -93,7 +93,7 @@ export default function App() {
     }, 400); // 400ms debounce to avoid spamming requests
 
     return () => clearTimeout(timer);
-  }, [memberId]);
+  }, [memberId, treatmentDate]);
 
   // Processing Visualizer state
   const [isProcessing, setIsProcessing] = useState(false);

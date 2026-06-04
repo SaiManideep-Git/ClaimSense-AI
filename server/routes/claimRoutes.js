@@ -337,9 +337,15 @@ router.get('/employee/:memberId', async (req, res) => {
     }
 
     // Calculate YTD Approved Amount for Annual Limit check
-    const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(`${currentYear}-01-01T00:00:00.000Z`);
-    const endOfYear = new Date(`${currentYear}-12-31T23:59:59.999Z`);
+    let claimYear = new Date().getFullYear();
+    if (req.query.treatmentDate) {
+      const parsedDate = new Date(req.query.treatmentDate);
+      if (!isNaN(parsedDate.getTime())) {
+        claimYear = parsedDate.getFullYear();
+      }
+    }
+    const startOfYear = new Date(`${claimYear}-01-01T00:00:00.000Z`);
+    const endOfYear = new Date(`${claimYear}-12-31T23:59:59.999Z`);
 
     let ytdApprovedAmount = 0;
     try {
