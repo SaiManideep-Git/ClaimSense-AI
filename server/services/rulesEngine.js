@@ -101,7 +101,7 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
 
   // Timeline filing check (LATE_SUBMISSION)
   const submissionTimeline = policy.claim_requirements?.submission_timeline_days || 30;
-  const now = new Date();
+  const now = claim.submissionDate ? new Date(claim.submissionDate) : new Date();
   const treatDateOnly = new Date(treatmentDate.getFullYear(), treatmentDate.getMonth(), treatmentDate.getDate());
   const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const submissionDiffDays = Math.floor((nowDateOnly - treatDateOnly) / (1000 * 60 * 60 * 24));
@@ -455,20 +455,6 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
 
   let eligibleBaseAmount = claimAmount;
 
-  // Check sub-limit for specific categories (Dental / Vision / Alternative)
-  if (claimCategory !== 'OPD' && claimAmount > categoryLimit) {
-    const limitExcess = claimAmount - categoryLimit;
-    result.deductions.limitExceeded = limitExcess;
-    eligibleBaseAmount = categoryLimit;
-    result.decision = 'PARTIAL';
-    result.rejectionReasons.push('SUB_LIMIT_EXCEEDED');
-    result.notes = `Claim amount ₹${claimAmount} exceeds the ${claimCategory} category sub-limit of ₹${categoryLimit}. Approved amount capped.`;
-  }
-
-  // ----------------------------------------------------
-  // STEP 5: Calculate Deductions (Partial / Network / Copay)
-  // ----------------------------------------------------
-  
   // Handle itemized rejections (e.g. Dental with root canal + teeth whitening)
   if (claimCategory === 'Dental') {
     const whiteningProcedure = extractedData?.procedures?.find(p => p.toLowerCase().includes('whitening') || p.toLowerCase().includes('bleaching'));
@@ -485,6 +471,16 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
         reason: 'Cosmetic procedure excluded under dental coverage.'
       });
     }
+  }
+
+  // Check sub-limit for specific categories (Dental / Vision / Alternative)
+  if (claimCategory !== 'OPD' && eligibleBaseAmount > categoryLimit) {
+    const limitExcess = eligibleBaseAmount - categoryLimit;
+    result.deductions.limitExceeded = limitExcess;
+    eligibleBaseAmount = categoryLimit;
+    result.decision = 'PARTIAL';
+    result.rejectionReasons.push('SUB_LIMIT_EXCEEDED');
+    result.notes = `Claim amount ₹${claimAmount} exceeds the ${claimCategory} category sub-limit of ₹${categoryLimit}. Approved amount capped.`;
   }
 
   // Calculate Copay / Network discounts
@@ -547,6 +543,28 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     result.confidenceScore = 0.70;
     result.notes = 'Claim referred for manual review: High-value OPD claims require auditor verification.';
     result.nextSteps = 'No action required. Your high-value claim has been forwarded for expert review.';
+    return result;
+  }
+
+  // Complex medical conditions check
+  const diagnosisLower = (extractedData?.diagnosis || '').toLowerCase();
+  const criticalKeywords = ['cancer', 'chemotherapy', 'oncology', 'tumor', 'cardiac', 'bypass', 'stroke', 'transplant', 'renal', 'neurological', 'myocardial'];
+  const isComplexCondition = criticalKeywords.some(kw => diagnosisLower.includes(kw));
+  if (isComplexCondition) {
+    result.decision = 'MANUAL_REVIEW';
+    result.flags.push('Complex medical condition');
+    result.confidenceScore = 0.60;
+    result.notes = `Claim referred for manual review: Complex diagnosis (${extractedData.diagnosis}) requires clinical audit verification.`;
+    result.nextSteps = 'Our medical director will review your complex care claim to authorize eligibility.';
+    return result;
+  }
+
+  // General confidence check (System confidence < 70%)
+  if (result.confidenceScore < 0.70) {
+    result.decision = 'MANUAL_REVIEW';
+    result.flags.push('Low confidence score');
+    result.notes = (result.notes ? result.notes + " " : "") + `Claim referred for manual review: System adjudication confidence is below 70% (${Math.round(result.confidenceScore * 100)}%).`;
+    result.nextSteps = 'Claim is being manually verified by our audit team due to low confidence scoring.';
     return result;
   }
 
