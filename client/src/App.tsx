@@ -304,10 +304,10 @@ export default function App() {
   
   // Submit Form state
   const [memberId, setMemberId] = useState('EMP001');
-  const [memberName, setMemberName] = useState('Rajesh Kumar');
-  const [treatmentDate, setTreatmentDate] = useState('2024-11-01');
-  const [claimAmount, setClaimAmount] = useState('1500');
-  const [hospital, setHospital] = useState('Fortis Healthcare');
+  const [memberName, setMemberName] = useState('');
+  const [treatmentDate, setTreatmentDate] = useState('');
+  const [claimAmount, setClaimAmount] = useState('');
+  const [hospital, setHospital] = useState('');
   const [cashlessRequest, setCashlessRequest] = useState(false);
   const [memberJoinDate, setMemberJoinDate] = useState('');
   const [previousClaimsSameDay, setPreviousClaimsSameDay] = useState('0');
@@ -449,10 +449,10 @@ export default function App() {
 
   const resetForm = () => {
     setMemberId('EMP001');
-    setMemberName('Rajesh Kumar');
-    setTreatmentDate('2024-11-01');
-    setClaimAmount('1500');
-    setHospital('Fortis Healthcare');
+    setMemberName('');
+    setTreatmentDate('');
+    setClaimAmount('');
+    setHospital('');
     setCashlessRequest(false);
     setMemberJoinDate('');
     setPreviousClaimsSameDay('0');
