@@ -639,7 +639,7 @@ export default function App() {
                   <div>
                     <h3 className="text-sm font-bold text-slate-300">Evaluating Claim Auditing</h3>
                     <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                      Select one of the 10 pre-loaded Test Cases from the dropdown to quickly verify how the OCR structured extraction parses document metadata, validates policy terms, calculates copays/discounts, and automatically makes decisions.
+                      Enter a registered Member ID to verify policy eligibility, set the treatment date, and fill in the claim amount. Upload the required doctor prescription and invoice bill documents. The Gemini AI engine will parse the files to validate doctor registration, verify treatment codes, and apply active copay/network rules automatically.
                     </p>
                   </div>
                 </div>
