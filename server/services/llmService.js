@@ -36,52 +36,43 @@ Important Rules:
 5. Normalize the doctorReg number if possible, ensuring it captures the state/number/year structure.`;
 
 /**
- * Extracts structured data from medical documents.
+ * Extracts structured data from medical documents using live Gemini/OpenAI API.
  * @param {Object} file - File object from Multer (buffer, mimetype, originalname)
  * @param {string} docType - "prescription" or "bill" or "report"
- * @param {Object} claimContext - Additional claim metadata (memberDetails, testCaseId)
+ * @param {Object} claimContext - Additional claim metadata
  * @returns {Promise<Object>} Extracted structured data
  */
 async function extractDocumentData(file, docType, claimContext = {}) {
-  const { testCaseId } = claimContext;
-
-  const isTestCase = !!(testCaseId || (file.originalname && file.originalname.match(/TC\d+/i)));
   const hasGeminiKey = !!process.env.GEMINI_API_KEY;
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 
-  let extracted = {};
-
   if (!hasGeminiKey && !hasOpenAIKey) {
-    console.log(`[LLM] API keys missing. Using mock extraction for ${file.originalname || docType}.`);
-    extracted = getMockExtraction(file, docType, testCaseId);
-  } else {
-    try {
-      if (hasGeminiKey) {
-        try {
-          console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
-          extracted = await extractWithGemini(file, docType);
-        } catch (geminiErr) {
-          console.warn(`[LLM] Gemini API failed: ${geminiErr.message}.`);
-          if (hasOpenAIKey) {
-            console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
-            extracted = await extractWithOpenAI(file, docType);
-          } else {
-            throw geminiErr;
-          }
-        }
-      } else if (hasOpenAIKey) {
-        console.log(`[LLM] Processing with OpenAI API: ${file.originalname}`);
-        extracted = await extractWithOpenAI(file, docType);
-      }
-    } catch (err) {
-      console.error(`[LLM] Live API extraction failed: ${err.message}. Falling back to mock extraction.`);
-      extracted = getMockExtraction(file, docType, testCaseId);
-    }
+    throw new Error('LLM API credentials missing. Please configure GEMINI_API_KEY or OPENAI_API_KEY in server environment.');
   }
 
-  // Rely purely on live API extraction. Mock fallback is handled above if keys are missing or extraction fails.
+  let extracted = {};
+
+  if (hasGeminiKey) {
+    try {
+      console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
+      extracted = await extractWithGemini(file, docType);
+    } catch (geminiErr) {
+      console.warn(`[LLM] Gemini API failed: ${geminiErr.message}.`);
+      if (hasOpenAIKey) {
+        console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
+        extracted = await extractWithOpenAI(file, docType);
+      } else {
+        throw geminiErr;
+      }
+    }
+  } else if (hasOpenAIKey) {
+    console.log(`[LLM] Processing with OpenAI API: ${file.originalname}`);
+    extracted = await extractWithOpenAI(file, docType);
+  }
+
   return extracted;
 }
+
 
 /**
  * Gemini API extraction
@@ -164,80 +155,7 @@ async function extractWithOpenAI(file, docType) {
   return JSON.parse(content);
 }
 
-/**
- * Mock Extraction Fallback.
- * Maps files to mock test case data from test_cases.json or returns smart defaults.
- */
-function getMockExtraction(file, docType, testCaseId) {
-  // Load test cases to see if we can extract matching data
-  try {
-    let testCasesPath = path.join(__dirname, '../../plum_intern_assignment/test_cases.json');
-    if (!fs.existsSync(testCasesPath)) {
-      testCasesPath = path.join(__dirname, '../test_cases.json');
-    }
-    if (!fs.existsSync(testCasesPath)) {
-      testCasesPath = path.join(__dirname, 'test_cases.json');
-    }
-    const testCasesData = JSON.parse(fs.readFileSync(testCasesPath, 'utf8'));
-    
-    // Find matching case
-    let targetCase = null;
-    if (testCaseId) {
-      targetCase = testCasesData.test_cases.find(tc => tc.case_id === testCaseId);
-    } else {
-      // Guess test case from file name, e.g. "TC002_bill.jpg"
-      const match = (file.originalname || '').match(/TC\d+/i);
-      if (match) {
-        const id = match[0].toUpperCase();
-        targetCase = testCasesData.test_cases.find(tc => tc.case_id === id);
-      }
-    }
-
-    if (targetCase) {
-      console.log(`[LLM Mock] Found matching test case: ${targetCase.case_id} (${targetCase.case_name})`);
-      const input = targetCase.input_data;
-      const prescription = input.documents?.prescription || {};
-      const bill = input.documents?.bill || {};
-
-      // Build structured model based on document type
-      return {
-        patientName: input.member_name,
-        hospitalName: input.hospital || "Care Clinic",
-        doctorName: prescription.doctor_name || "Dr. Self",
-        doctorReg: prescription.doctor_reg || "KA/12345/2018",
-        consultationDate: input.treatment_date,
-        claimAmount: input.claim_amount,
-        consultationFee: bill.consultation_fee || 0,
-        medicines: prescription.medicines_prescribed || [],
-        tests: prescription.tests_prescribed || bill.test_names || [],
-        procedures: prescription.procedures 
-          ? prescription.procedures 
-          : (prescription.treatment ? [prescription.treatment] : []),
-        diagnosis: prescription.diagnosis || "Consultation",
-        claimType: prescription.procedures ? "Dental" : (prescription.treatment ? "Alternative" : "OPD")
-      };
-    }
-  } catch (e) {
-    console.error('[LLM Mock] Failed to read test cases for mock extraction:', e.message);
-  }
-
-  // Generic Mock Fallback
-  console.log('[LLM Mock] Returning generic OPD mock data');
-  return {
-    patientName: claimContext.memberName || "Rajesh Kumar",
-    hospitalName: claimContext.hospital || "Fortis Healthcare",
-    doctorName: "Dr. Sharma",
-    doctorReg: "KA/45678/2015",
-    consultationDate: new Date().toISOString().split('T')[0],
-    claimAmount: claimContext.claimAmount || 1500,
-    consultationFee: 1000,
-    medicines: ["Paracetamol 650mg", "Amoxicillin 500mg"],
-    tests: ["CBC"],
-    procedures: [],
-    diagnosis: "Viral fever",
-    claimType: "OPD"
-  };
-}
+// Mock fallback disabled per user request
 
 /**
  * Safely determines the mimetype of a file by verifying magic numbers of images/PDFs.
