@@ -119,6 +119,24 @@ router.post('/submit', upload, async (req, res) => {
       return res.status(201).json(newClaim);
     }
 
+    // Calculate same-day claims automatically from database
+    let actualSameDayClaims = 0;
+    try {
+      const targetDate = new Date(treatmentDate);
+      const startOfDay = new Date(targetDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      actualSameDayClaims = await Claim.countDocuments({
+        memberId,
+        treatmentDate: { $gte: startOfDay, $lte: endOfDay }
+      });
+      console.log(`[Claim Submission] Auto-detected ${actualSameDayClaims} claims for same treatment date: ${treatmentDate}`);
+    } catch (dbErr) {
+      console.error('[Claim Submission] Error calculating same-day claims count:', dbErr.message);
+    }
+
     const claimContext = {
       memberId,
       memberName,
@@ -127,7 +145,7 @@ router.post('/submit', upload, async (req, res) => {
       hospital,
       cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
       memberJoinDate: joinDateToUse,
-      previousClaimsSameDay: Number(previousClaimsSameDay || 0)
+      previousClaimsSameDay: actualSameDayClaims
     };
 
     console.log(`[Claim Submission] Processing claim for ${memberName} (${memberId}), amount: ₹${claimAmount}`);
