@@ -185,6 +185,7 @@ router.post('/submit', upload, async (req, res) => {
     // 2. Multi-document structured data extraction
     let prescriptionExtracted = {};
     let billExtracted = {};
+    let reportExtracted = {};
 
     if (prescriptionFile) {
       prescriptionExtracted = await extractDocumentData(prescriptionFile, 'prescription', claimContext);
@@ -194,6 +195,21 @@ router.post('/submit', upload, async (req, res) => {
       billExtracted = await extractDocumentData(billFile, 'bill', claimContext);
       uploadedDocs.bill.extractedText = JSON.stringify(billExtracted);
     }
+    if (reportFiles.length > 0) {
+      try {
+        reportExtracted = await extractDocumentData(reportFiles[0], 'report', claimContext);
+        if (uploadedDocs.reports && uploadedDocs.reports[0]) {
+          uploadedDocs.reports[0].extractedText = JSON.stringify(reportExtracted);
+        }
+        console.log('[Claim Submission] Successfully extracted data from diagnostic report:', reportExtracted);
+      } catch (reportErr) {
+        console.error('[Claim Submission] Error extracting from report file:', reportErr.message);
+      }
+    }
+
+    // Assign report variables to claimContext for the rules engine
+    claimContext.hasReportUploaded = reportFiles.length > 0;
+    claimContext.reportExtracted = reportExtracted;
 
     // 3. Aggregate Extracted Data
     const medicinesCombined = Array.from(new Set([

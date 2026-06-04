@@ -46,6 +46,7 @@ export default function App() {
   const [memberJoinDate, setMemberJoinDate] = useState('');
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [billFile, setBillFile] = useState<File | null>(null);
+  const [reportFile, setReportFile] = useState<File | null>(null);
 
   // Employee DB verification state
   const [employeeDetails, setEmployeeDetails] = useState<any>(null);
@@ -150,6 +151,7 @@ export default function App() {
     setMemberJoinDate('');
     setPrescriptionFile(null);
     setBillFile(null);
+    setReportFile(null);
         setCreatedClaim(null);
     setEmployeeDetails(null);
     setPolicyDetails(null);
@@ -211,6 +213,9 @@ export default function App() {
       }
       if (billFile) {
         formData.append('bill', billFile);
+      }
+      if (reportFile) {
+        formData.append('reports', reportFile);
       }
 
       const response = await fetch(`${API_URL}/api/claims/submit`, {
@@ -494,7 +499,7 @@ export default function App() {
                   </div>
 
                   {/* Documents File Drag and Drop */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     
                     {/* Prescription Uploader */}
                     <div className="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/20 hover:border-brand-500/40 transition text-center flex flex-col justify-center min-h-[140px]">
@@ -536,7 +541,31 @@ export default function App() {
                       )}
                     </div>
 
+                    {/* Diagnostic Report Uploader */}
+                    <div className="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/20 hover:border-brand-500/40 transition text-center flex flex-col justify-center min-h-[140px]">
+                      <FileUp className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+                      <span className="text-xs font-semibold text-slate-300 block mb-1">Diagnostic Report (Optional)</span>
+                      <span className="text-[10px] text-slate-500 block mb-3">Upload lab/radiology report</span>
+                      
+                      <label className="inline-block bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-4 py-1.5 rounded text-[11px] cursor-pointer max-w-[160px] mx-auto transition">
+                        Select File
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={e => setReportFile(e.target.files?.[0] || null)}
+                          className="hidden"
+                        />
+                      </label>
+                      {reportFile && (
+                        <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">✓ {reportFile.name}</span>
+                      )}
+                    </div>
+
                   </div>
+
+                  <span className="text-[10px] text-slate-500 block mt-2">
+                    *Note: Diagnostic Reports are optional unless your claim consists of diagnostic scans/tests (e.g. MRI, CT Scan, X-Ray, Blood tests), in which case uploading the matching report file is required.
+                  </span>
 
                   {/* Actions buttons */}
                   <div className="flex justify-end gap-3 pt-4">

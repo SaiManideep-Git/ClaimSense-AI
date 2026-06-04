@@ -6,16 +6,17 @@ const path = require('path');
 const extractionSchema = {
   patientName: "Full name of the patient as listed on the document",
   hospitalName: "Name of the clinic, hospital, or diagnostic center",
-  doctorName: "Name of the doctor/consultant",
+  doctorName: "Name of the doctor/consultant/pathologist",
   doctorReg: "Doctor registration number (e.g. KA/45678/2015 or standard format on stamp)",
-  consultationDate: "Date of treatment/billing in YYYY-MM-DD format",
-  claimAmount: "Total billed amount as a number",
+  consultationDate: "Date of treatment/billing/report in YYYY-MM-DD format",
+  claimAmount: "Total billed amount as a number (if present, otherwise 0)",
   consultationFee: "Consultation charges if itemized, otherwise 0",
   medicines: ["Array of medicine names prescribed or purchased"],
-  tests: ["Array of lab/diagnostic tests advised (e.g. CBC, MRI, Blood Sugar, X-Ray)"],
+  tests: ["Array of lab/diagnostic tests reported or conducted (e.g. CBC, MRI, Blood Sugar, X-Ray)"],
   procedures: ["Array of clinical procedures performed (e.g. Root canal, Dressing, Teeth whitening)"],
-  diagnosis: "Primary diagnosis or symptoms written (e.g. Viral fever, Tooth decay, Gastroenteritis)",
-  claimType: "Strictly one of: 'OPD' (general consultation/pharmacy), 'Dental', 'Vision', 'Alternative' (Ayurveda/Homeopathy)"
+  diagnosis: "Primary diagnosis or clinical symptoms (e.g. Viral fever, Tooth decay, Gastroenteritis)",
+  findings: "For reports: clinical findings, lab observations, or diagnostic impression (e.g. L4-L5 disc bulge, normal blood counts, clear chest)",
+  claimType: "Strictly one of: 'OPD' (general consultation/pharmacy/report), 'Dental', 'Vision', 'Alternative' (Ayurveda/Homeopathy)"
 };
 
 // System Prompt for structured vision extraction

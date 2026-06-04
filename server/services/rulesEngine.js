@@ -265,7 +265,111 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     result.notes = 'Vitamins and supplements are excluded from coverage unless prescribed for a specific deficiency.';
     return result;
   }
+  // ----------------------------------------------------
+  // STEP 3.5: Medical Necessity & Diagnostic Report Verification
+  // ----------------------------------------------------
+  const billedTests = extractedData?.tests || [];
+  const billedProcedures = extractedData?.procedures || [];
 
+  // Keywords indicating diagnostic tests that require a report:
+  const diagnosticTestKeywords = ['mri', 'magnetic resonance', 'ct scan', 'computed tomography', 'x-ray', 'ultrasound', 'cbc', 'lipid', 'blood test', 'ecg', 'electrocardiogram'];
+  
+  // Find which billed test or procedure matches these diagnostic keywords
+  const requiredReportTest = billedTests.find(t => 
+    diagnosticTestKeywords.some(kw => String(t).toLowerCase().includes(kw))
+  ) || billedProcedures.find(p => 
+    diagnosticTestKeywords.some(kw => String(p).toLowerCase().includes(kw))
+  );
+
+  if (requiredReportTest) {
+    // If a diagnostic test is detected, verify a report is uploaded
+    if (!claim.hasReportUploaded) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('MISSING_DOCUMENTS');
+      result.notes = `Claim contains diagnostic test/procedure (${requiredReportTest}) but the matching diagnostic/laboratory test report was not uploaded. Uploading the matching report is required.`;
+      return result;
+    }
+
+    // If report is uploaded, validate its details
+    if (claim.reportExtracted) {
+      // 1. Validate patient name matches member name
+      const reportPatient = (claim.reportExtracted.patientName || '').trim();
+      if (memberName && reportPatient) {
+        const cleanMember = memberName.toLowerCase().replace(/[^a-z]/g, '');
+        const cleanReportPatient = reportPatient.toLowerCase().replace(/[^a-z]/g, '');
+        const isNameMatch = cleanMember.includes(cleanReportPatient) || 
+                            cleanReportPatient.includes(cleanMember) || 
+                            (cleanMember.slice(0, 4) === cleanReportPatient.slice(0, 4));
+        if (!isNameMatch) {
+          result.decision = 'REJECTED';
+          result.rejectionReasons.push('PATIENT_MISMATCH');
+          result.notes = `Patient name on diagnostic report (${reportPatient}) does not match member name (${memberName}).`;
+          return result;
+        }
+      }
+
+      // 2. Validate report test type matches billed test
+      const reportTests = claim.reportExtracted.tests || [];
+      const reportProcedures = claim.reportExtracted.procedures || [];
+      const hasMatchingTestInReport = reportTests.some(rt => 
+        String(rt).toLowerCase().includes(requiredReportTest.toString().toLowerCase()) ||
+        requiredReportTest.toString().toLowerCase().includes(String(rt).toLowerCase())
+      ) || reportProcedures.some(rp => 
+        String(rp).toLowerCase().includes(requiredReportTest.toString().toLowerCase()) ||
+        requiredReportTest.toString().toLowerCase().includes(String(rp).toLowerCase())
+      );
+
+      if (!hasMatchingTestInReport && reportTests.length > 0) {
+        // Fallback check to ensure they didn't upload a completely different test report
+        const cleanBilled = requiredReportTest.toString().toLowerCase();
+        const hasBroadMatch = reportTests.some(rt => {
+          const r = String(rt).toLowerCase();
+          return (cleanBilled.includes('mri') && r.includes('mri')) ||
+                 (cleanBilled.includes('ct') && r.includes('ct')) ||
+                 (cleanBilled.includes('x-ray') && r.includes('x-ray')) ||
+                 (cleanBilled.includes('blood') && r.includes('blood')) ||
+                 (cleanBilled.includes('lipid') && r.includes('lipid')) ||
+                 (cleanBilled.includes('ecg') && r.includes('ecg'));
+        });
+
+        if (!hasBroadMatch) {
+          result.decision = 'REJECTED';
+          result.rejectionReasons.push('MISSING_DOCUMENTS');
+          result.notes = `The uploaded diagnostic report (${reportTests.join(', ')}) does not match the billed diagnostic test (${requiredReportTest}).`;
+          return result;
+        }
+      }
+    }
+  }
+
+  // 3. General Medical Necessity Alignment (Diagnosis justifies treatment)
+  const currentDiagnosis = (extractedData?.diagnosis || '').toLowerCase();
+  const lowerProcedures = (extractedData?.procedures || []).map(p => String(p).toLowerCase());
+  const lowerTests = (extractedData?.tests || []).map(t => String(t).toLowerCase());
+
+  // Dental alignment check
+  const isDentalTreatment = lowerProcedures.some(p => p.includes('root canal') || p.includes('filling') || p.includes('dental') || p.includes('extraction') || p.includes('scaling'));
+  const isDentalDiagnosis = currentDiagnosis.includes('tooth') || currentDiagnosis.includes('dental') || currentDiagnosis.includes('caries') || currentDiagnosis.includes('root canal');
+  if (isDentalTreatment && !isDentalDiagnosis && currentDiagnosis) {
+    if (currentDiagnosis.includes('myopia') || currentDiagnosis.includes('vision') || currentDiagnosis.includes('cataract') || currentDiagnosis.includes('fever') || currentDiagnosis.includes('bp')) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('NOT_MEDICALLY_NECESSARY');
+      result.notes = `Dental treatment is not justified by the diagnosis of '${extractedData.diagnosis}'.`;
+      return result;
+    }
+  }
+
+  // Vision alignment check
+  const isVisionTreatment = lowerProcedures.some(p => p.includes('eye test') || p.includes('lasik') || p.includes('glasses') || p.includes('lens')) || lowerTests.some(t => t.includes('eye test'));
+  const isVisionDiagnosis = currentDiagnosis.includes('myopia') || currentDiagnosis.includes('vision') || currentDiagnosis.includes('cataract') || currentDiagnosis.includes('eye');
+  if (isVisionTreatment && !isVisionDiagnosis && currentDiagnosis) {
+    if (currentDiagnosis.includes('tooth') || currentDiagnosis.includes('dental') || currentDiagnosis.includes('fever') || currentDiagnosis.includes('bp')) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('NOT_MEDICALLY_NECESSARY');
+      result.notes = `Vision treatment is not justified by the diagnosis of '${extractedData.diagnosis}'.`;
+      return result;
+    }
+  }
   // ----------------------------------------------------
   // STEP 4: Process and Limit validation
   // ----------------------------------------------------
