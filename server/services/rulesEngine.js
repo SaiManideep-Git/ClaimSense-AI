@@ -55,9 +55,27 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     confidenceScore: 0.95
   };
 
+  // Dynamic Policy mapping to handle both nested JSON structures and flat MongoDB models:
+  const annualLimit = policy.annualLimit !== undefined ? policy.annualLimit : (policy.coverage_details?.annual_limit || 50000);
+  const perClaimLimit = policy.perClaimLimit !== undefined ? policy.perClaimLimit : (policy.coverage_details?.per_claim_limit || 5000);
+  
+  const copayPercentage = policy.copayPercentage !== undefined ? policy.copayPercentage : (policy.coverage_details?.consultation_fees?.copay_percentage || 10);
+  const networkDiscount = policy.networkDiscount !== undefined ? policy.networkDiscount : (policy.coverage_details?.consultation_fees?.network_discount || 20);
+
+  const dentalSubLimit = policy.dentalSubLimit !== undefined ? policy.dentalSubLimit : (policy.coverage_details?.dental?.sub_limit || 10000);
+  const visionSubLimit = policy.visionSubLimit !== undefined ? policy.visionSubLimit : (policy.coverage_details?.vision?.sub_limit || 5000);
+  const alternativeSubLimit = policy.alternativeSubLimit !== undefined ? policy.alternativeSubLimit : (policy.coverage_details?.alternative_medicine?.sub_limit || 8000);
+
+  const initialWaitingDays = policy.initialWaitingDays !== undefined ? policy.initialWaitingDays : (policy.waiting_periods?.initial_waiting || 30);
+  const chronicWaitingDays = policy.chronicWaitingDays !== undefined ? policy.chronicWaitingDays : (policy.waiting_periods?.specific_ailments?.diabetes || 90);
+  
+  const effectiveDate = policy.effectiveDate || policy.effective_date || "2024-01-01";
+  const expirationDate = policy.expirationDate || policy.expiration_date || "2024-12-31";
+
   const treatmentDateStr = claim.treatmentDate || claim.treatment_date || (extractedData && extractedData.consultationDate);
   const treatmentDate = new Date(treatmentDateStr);
   const claimAmount = Number(claim.claimAmount || claim.claim_amount || 0);
+  const ytdApprovedAmount = Number(claim.ytdApprovedAmount || 0);
 
   // Helper: check if lists contain any keyword
   const containsKeyword = (list, keywords) => {
@@ -72,12 +90,12 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   // ----------------------------------------------------
   
   // Policy Active Status Check (POLICY_INACTIVE)
-  const policyEffective = new Date(policy.effective_date || "2024-01-01");
-  const policyExpiration = new Date(policy.expiration_date || "2024-12-31");
+  const policyEffective = new Date(effectiveDate);
+  const policyExpiration = new Date(expirationDate);
   if (treatmentDate < policyEffective || treatmentDate > policyExpiration) {
     result.decision = 'REJECTED';
     result.rejectionReasons.push('POLICY_INACTIVE');
-    result.notes = `The policy was not active on the treatment date (${treatmentDateStr}). Policy active period is ${policy.effective_date} to ${policy.expiration_date}.`;
+    result.notes = `The policy was not active on the treatment date (${treatmentDateStr}). Policy active period is ${effectiveDate.toString().split('T')[0]} to ${expirationDate.toString().split('T')[0]}.`;
     return result;
   }
 
@@ -122,10 +140,10 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     // Initial waiting period (30 days)
-    if (diffDays < (policy.waiting_periods?.initial_waiting || 30)) {
+    if (diffDays < initialWaitingDays) {
       result.decision = 'REJECTED';
       result.rejectionReasons.push('WAITING_PERIOD');
-      result.notes = `Treatment received during the initial 30-day waiting period.`;
+      result.notes = `Treatment received during the initial ${initialWaitingDays}-day waiting period.`;
       return result;
     }
 
@@ -133,23 +151,21 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     const diagnosis = (extractedData?.diagnosis || '').toLowerCase();
     
     if (diagnosis.includes('diabetes') || containsKeyword(extractedData?.medicines, ['metformin', 'glimepiride', 'insulin'])) {
-      const diabetesWait = policy.waiting_periods?.specific_ailments?.diabetes || 90;
-      if (diffDays < diabetesWait) {
+      if (diffDays < chronicWaitingDays) {
         result.decision = 'REJECTED';
         result.rejectionReasons.push('WAITING_PERIOD');
-        const eligibleDate = new Date(joinDate.getTime() + (diabetesWait * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-        result.notes = `Diabetes has a ${diabetesWait}-day waiting period. Eligible from ${eligibleDate}`;
+        const eligibleDate = new Date(joinDate.getTime() + (chronicWaitingDays * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        result.notes = `Diabetes has a ${chronicWaitingDays}-day waiting period. Eligible from ${eligibleDate}`;
         return result;
       }
     }
 
     if (diagnosis.includes('hypertension') || diagnosis.includes('high blood pressure') || containsKeyword(extractedData?.medicines, ['amlodipine', 'telmisartan', 'losartan'])) {
-      const hyperWait = policy.waiting_periods?.specific_ailments?.hypertension || 90;
-      if (diffDays < hyperWait) {
+      if (diffDays < chronicWaitingDays) {
         result.decision = 'REJECTED';
         result.rejectionReasons.push('WAITING_PERIOD');
-        const eligibleDate = new Date(joinDate.getTime() + (hyperWait * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-        result.notes = `Hypertension has a ${hyperWait}-day waiting period. Eligible from ${eligibleDate}`;
+        const eligibleDate = new Date(joinDate.getTime() + (chronicWaitingDays * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        result.notes = `Hypertension has a ${chronicWaitingDays}-day waiting period. Eligible from ${eligibleDate}`;
         return result;
       }
     }
@@ -262,9 +278,6 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   }
 
   // Annual Limit Check (ANNUAL_LIMIT_EXCEEDED)
-  const annualLimit = policy.coverage_details?.annual_limit || 50000;
-  const ytdApprovedAmount = Number(claim.ytdApprovedAmount || 0);
-
   if (ytdApprovedAmount >= annualLimit) {
     result.decision = 'REJECTED';
     result.rejectionReasons.push('ANNUAL_LIMIT_EXCEEDED');
@@ -286,13 +299,13 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   }
 
   // Determine sub-limit and check limits
-  let categoryLimit = policy.coverage_details?.per_claim_limit || 5000;
+  let categoryLimit = perClaimLimit;
   if (claimCategory === 'Dental') {
-    categoryLimit = policy.coverage_details?.dental?.sub_limit || 10000;
+    categoryLimit = dentalSubLimit;
   } else if (claimCategory === 'Vision') {
-    categoryLimit = policy.coverage_details?.vision?.sub_limit || 5000;
+    categoryLimit = visionSubLimit;
   } else if (claimCategory === 'Alternative') {
-    categoryLimit = policy.coverage_details?.alternative_medicine?.sub_limit || 8000;
+    categoryLimit = alternativeSubLimit;
   }
 
   // If it's a general OPD claim and exceeds the per-claim limit
@@ -339,15 +352,13 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
 
   if (claimCategory === 'OPD') {
     if (isNetworkHospital) {
-      const discountPct = policy.coverage_details?.consultation_fees?.network_discount || 20;
-      result.deductions.networkDiscount = eligibleBaseAmount * (discountPct / 100);
+      result.deductions.networkDiscount = eligibleBaseAmount * (networkDiscount / 100);
       result.approvedAmount = eligibleBaseAmount - result.deductions.networkDiscount;
-      result.notes = `Network hospital discount of ${discountPct}% applied.`;
+      result.notes = `Network hospital discount of ${networkDiscount}% applied.`;
     } else {
-      const copayPct = policy.coverage_details?.consultation_fees?.copay_percentage || 10;
-      result.deductions.copay = eligibleBaseAmount * (copayPct / 100);
+      result.deductions.copay = eligibleBaseAmount * (copayPercentage / 100);
       result.approvedAmount = eligibleBaseAmount - result.deductions.copay;
-      result.notes = `Co-payment of ${copayPct}% applied for treatment at non-network facility.`;
+      result.notes = `Co-payment of ${copayPercentage}% applied for treatment at non-network facility.`;
     }
   } else {
     // Dental / Vision / Alternative medicine (approved amount equals eligibleBaseAmount without copay unless specified)

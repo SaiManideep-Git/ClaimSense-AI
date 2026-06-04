@@ -6,21 +6,11 @@ const fs = require('fs');
 const path = require('path');
 
 const Claim = require('../models/Claim');
+const Employee = require('../models/Employee');
+const Policy = require('../models/Policy');
 const { uploadFile } = require('../services/fileStorage');
 const { extractDocumentData } = require('../services/llmService');
 const { adjudicateClaim } = require('../services/rulesEngine');
-
-// Load Mock TechCorp Employee Registry
-let employees = [];
-try {
-  const employeesPath = path.join(__dirname, '../config/employees.json');
-  if (fs.existsSync(employeesPath)) {
-    employees = JSON.parse(fs.readFileSync(employeesPath, 'utf8'));
-  }
-} catch (e) {
-  console.warn('[Claim Routes] Mock employees database failed to load:', e.message);
-}
-
 // Multer in-memory storage for handling uploads before streaming to Cloudinary or saving locally
 const storage = multer.memoryStorage();
 const upload = multer({ storage }).fields([
@@ -53,7 +43,7 @@ router.post('/submit', upload, async (req, res) => {
     }
 
     // A. Eligibility Check: Member Covered (MEMBER_NOT_COVERED)
-    const employee = employees.find(emp => emp.memberId === memberId);
+    const employee = await Employee.findOne({ memberId });
     if (!employee || employee.status !== 'Active') {
       const ruleResult = {
         decision: 'REJECTED',
@@ -83,12 +73,15 @@ router.post('/submit', upload, async (req, res) => {
       return res.status(201).json(newClaim);
     }
 
-    // B. Auto-fill Join Date if left blank
-    let joinDateToUse = memberJoinDate;
-    if (!joinDateToUse && employee) {
-      joinDateToUse = employee.joinDate;
-      console.log(`[Claim Submission] Auto-filled joining date for ${memberId}: ${joinDateToUse}`);
+    // A2. Fetch Policy Guidelines from DB
+    const policy = await Policy.findOne({ policyId: employee.policyId });
+    if (!policy) {
+      return res.status(500).json({ error: 'Linked corporate Policy not found in database registry.' });
     }
+
+    // B. Use Join Date from Employee Registry database
+    const joinDateToUse = employee.joinDate;
+    console.log(`[Claim Submission] Retieved joining date for ${memberId}: ${joinDateToUse}`);
 
     // C. Duplicate Claim Check (DUPLICATE_CLAIM)
     const duplicate = await Claim.findOne({
@@ -238,7 +231,7 @@ router.post('/submit', upload, async (req, res) => {
     claimContext.ytdApprovedAmount = ytdApprovedAmount;
 
     // 4. Run Policy Rules Engine
-    const ruleResult = adjudicateClaim(claimContext, aggregatedData);
+    const ruleResult = adjudicateClaim(claimContext, aggregatedData, policy);
 
     // 5. Store claim record in database
     const newClaim = new Claim({
@@ -437,4 +430,50 @@ router.get('/test-suite/run', async (req, res) => {
   }
 });
 
+/**
+ * @route   GET /api/claims/employee/:memberId
+ * @desc    Fetch employee details and linked policy rules with YTD calculations
+ */
+router.get('/employee/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const employee = await Employee.findOne({ memberId });
+    if (!employee) {
+      return res.status(404).json({ error: `Employee profile with ID ${memberId} not found in database registry.` });
+    }
+
+    const policy = await Policy.findOne({ policyId: employee.policyId });
+    if (!policy) {
+      return res.status(404).json({ error: `Linked corporate Policy ${employee.policyId} not found.` });
+    }
+
+    // Calculate YTD Approved Amount for Annual Limit check
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(`${currentYear}-01-01T00:00:00.000Z`);
+    const endOfYear = new Date(`${currentYear}-12-31T23:59:59.999Z`);
+
+    let ytdApprovedAmount = 0;
+    try {
+      const pastClaims = await Claim.find({
+        memberId,
+        status: { $in: ['approved', 'partial'] },
+        treatmentDate: { $gte: startOfYear, $lte: endOfYear }
+      });
+      ytdApprovedAmount = pastClaims.reduce((sum, c) => sum + (c.adjudication.approvedAmount || 0), 0);
+    } catch (dbErr) {
+      console.error('[Employee API] Error fetching YTD approved amount:', dbErr.message);
+    }
+
+    res.json({
+      success: true,
+      employee,
+      policy,
+      ytdApprovedAmount
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve employee record', details: err.message });
+  }
+});
+
 module.exports = router;
+

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, History, Sparkles, User, Calendar, CreditCard, Network, AlertCircle } from 'lucide-react';
+import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, History, Sparkles, User, Calendar, CreditCard, Network, AlertCircle, Lock } from 'lucide-react';
 import { PolicyViewer } from './components/PolicyViewer';
+
 import { ClaimDetailsModal } from './components/ClaimDetailsModal';
 
 import testCasesData from './test_cases.json';
@@ -314,12 +315,60 @@ export default function App() {
   const [billFile, setBillFile] = useState<File | null>(null);
   const [testCaseId, setTestCaseId] = useState('');
 
+  // Employee DB verification state
+  const [employeeDetails, setEmployeeDetails] = useState<any>(null);
+  const [policyDetails, setPolicyDetails] = useState<any>(null);
+  const [ytdApprovedAmount, setYtdApprovedAmount] = useState<number>(0);
+  const [isFetchingEmployee, setIsFetchingEmployee] = useState(false);
+  const [employeeFetchError, setEmployeeFetchError] = useState('');
+
+  // Fetch employee details automatically when memberId is entered
+  useEffect(() => {
+    if (!memberId) {
+      setEmployeeDetails(null);
+      setPolicyDetails(null);
+      setYtdApprovedAmount(0);
+      setEmployeeFetchError('');
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsFetchingEmployee(true);
+      setEmployeeFetchError('');
+      try {
+        const response = await fetch(`${API_URL}/api/claims/employee/${memberId}`);
+        if (!response.ok) {
+          throw new Error('Member ID not found in corporate records.');
+        }
+        const data = await response.json();
+        if (data.success) {
+          setEmployeeDetails(data.employee);
+          setPolicyDetails(data.policy);
+          setYtdApprovedAmount(data.ytdApprovedAmount);
+          setMemberName(data.employee.name);
+          const jd = new Date(data.employee.joinDate).toISOString().split('T')[0];
+          setMemberJoinDate(jd);
+        }
+      } catch (err: any) {
+        setEmployeeDetails(null);
+        setPolicyDetails(null);
+        setYtdApprovedAmount(0);
+        setEmployeeFetchError(err.message || 'Error looking up member ID');
+      } finally {
+        setIsFetchingEmployee(false);
+      }
+    }, 400); // 400ms debounce to avoid spamming requests
+
+    return () => clearTimeout(timer);
+  }, [memberId]);
+
   // Processing Visualizer state
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
   const [processingLogs, setProcessingLogs] = useState<string[]>([]);
   const [createdClaim, setCreatedClaim] = useState<Claim | null>(null);
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
+
 
   // API URL Validation Warning
   const [urlWarningMessage, setUrlWarningMessage] = useState('');
@@ -411,7 +460,12 @@ export default function App() {
     setBillFile(null);
     setTestCaseId('');
     setCreatedClaim(null);
+    setEmployeeDetails(null);
+    setPolicyDetails(null);
+    setYtdApprovedAmount(0);
+    setEmployeeFetchError('');
   };
+
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -617,7 +671,12 @@ export default function App() {
                   {/* Core Inputs Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Member ID (Policy Record)</label>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs text-slate-400 font-semibold">Member ID (Policy Record)</label>
+                        {isFetchingEmployee && (
+                          <span className="text-[10px] text-amber-400 font-semibold animate-pulse">Verifying...</span>
+                        )}
+                      </div>
                       <div className="relative">
                         <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                         <input
@@ -631,15 +690,16 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Member Full Name</label>
+                      <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Member Full Name (Fetched from Registry)</label>
                       <div className="relative">
-                        <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                        <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                         <input
                           type="text"
                           required
+                          readOnly
                           value={memberName}
-                          onChange={e => setMemberName(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500"
+                          placeholder="Loading registered member..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-400 cursor-not-allowed focus:outline-none"
                         />
                       </div>
                     </div>
@@ -672,7 +732,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Hospital / Clinic Name</label>
                       <div className="relative">
                         <Network className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
@@ -685,20 +745,68 @@ export default function App() {
                         />
                       </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Member Joining Date (Optional - For waiting checks)</label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-                        <input
-                          type="date"
-                          value={memberJoinDate}
-                          onChange={e => setMemberJoinDate(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500"
-                        />
+                  {/* Verified Employee Details Glassmorphic Info Card */}
+                  {employeeDetails && policyDetails && (
+                    <div className="bg-slate-950/40 p-4 rounded-xl border border-emerald-500/30 shadow-lg shadow-emerald-500/5 transition-all duration-300">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Policy Holder Verified</span>
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/30">
+                              {employeeDetails.status}
+                            </span>
+                          </div>
+                          <p className="text-sm font-semibold text-slate-100">{employeeDetails.name} ({employeeDetails.memberId})</p>
+                          <p className="text-xs text-slate-400">
+                            Joined TechCorp: <span className="text-slate-300 font-medium">{new Date(employeeDetails.joinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          </p>
+                        </div>
+
+                        <div className="flex-1 max-w-md md:pl-6 space-y-1.5 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-slate-400">Annual Policy Spend</span>
+                            <span className={ytdApprovedAmount >= (policyDetails.annualLimit || 50000) ? "text-red-400" : "text-slate-200"}>
+                              ₹{ytdApprovedAmount.toLocaleString('en-IN')} / ₹{(policyDetails.annualLimit || 50000).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          
+                          <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                ytdApprovedAmount >= (policyDetails.annualLimit || 50000)
+                                  ? 'bg-red-500' 
+                                  : ytdApprovedAmount > (policyDetails.annualLimit || 50000) * 0.8
+                                  ? 'bg-amber-500'
+                                  : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              }`}
+                              style={{ width: `${Math.min(100, (ytdApprovedAmount / (policyDetails.annualLimit || 50000)) * 100)}%` }}
+                            ></div>
+                          </div>
+                          
+                          <div className="flex justify-between text-[10px] text-slate-500">
+                            <span>Remaining: ₹{Math.max(0, (policyDetails.annualLimit || 50000) - ytdApprovedAmount).toLocaleString('en-IN')}</span>
+                            {ytdApprovedAmount >= (policyDetails.annualLimit || 50000) && (
+                              <span className="text-red-400 font-semibold">Limit Exhausted!</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {employeeFetchError && (
+                    <div className="bg-red-950/20 border border-red-500/30 p-3.5 rounded-xl flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-red-300">Member Verification Failed</p>
+                        <p className="text-xs text-red-400/90">{employeeFetchError}. Submitting this claim will result in an automatic rejection.</p>
+                      </div>
+                    </div>
+                  )}
+
 
                   {/* Switch & Advanced triggers */}
                   <div className="flex flex-wrap gap-6 items-center bg-slate-950/40 p-4 rounded-xl border border-slate-850">
