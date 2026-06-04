@@ -1,5 +1,4 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 
@@ -36,7 +35,7 @@ Important Rules:
 5. Normalize the doctorReg number if possible, ensuring it captures the state/number/year structure.`;
 
 /**
- * Extracts structured data from medical documents using live Gemini/OpenAI API.
+ * Extracts structured data from medical documents using live Gemini API.
  * @param {Object} file - File object from Multer (buffer, mimetype, originalname)
  * @param {string} docType - "prescription" or "bill" or "report"
  * @param {Object} claimContext - Additional claim metadata
@@ -44,32 +43,13 @@ Important Rules:
  */
 async function extractDocumentData(file, docType, claimContext = {}) {
   const hasGeminiKey = !!process.env.GEMINI_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 
-  if (!hasGeminiKey && !hasOpenAIKey) {
-    throw new Error('LLM API credentials missing. Please configure GEMINI_API_KEY or OPENAI_API_KEY in server environment.');
+  if (!hasGeminiKey) {
+    throw new Error('Gemini API credentials missing. Please configure GEMINI_API_KEY in server environment.');
   }
 
-  let extracted = {};
-
-  if (hasGeminiKey) {
-    try {
-      console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
-      extracted = await extractWithGemini(file, docType);
-    } catch (geminiErr) {
-      console.warn(`[LLM] Gemini API failed: ${geminiErr.message}.`);
-      if (hasOpenAIKey) {
-        console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
-        extracted = await extractWithOpenAI(file, docType);
-      } else {
-        throw geminiErr;
-      }
-    }
-  } else if (hasOpenAIKey) {
-    console.log(`[LLM] Processing with OpenAI API: ${file.originalname}`);
-    extracted = await extractWithOpenAI(file, docType);
-  }
-
+  console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
+  const extracted = await extractWithGemini(file, docType);
   return extracted;
 }
 
@@ -108,52 +88,7 @@ async function extractWithGemini(file, docType) {
   return JSON.parse(text);
 }
 
-/**
- * OpenAI API extraction
- */
-async function extractWithOpenAI(file, docType) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const base64Image = file.buffer.toString('base64');
-  
-  let messages = [
-    {
-      role: 'system',
-      content: SYSTEM_PROMPT
-    }
-  ];
-
-  const safeMime = getSafeMimeType(file);
-  // OpenAI gpt-4o-mini supports image URLs/base64
-  if (safeMime.startsWith('image/')) {
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: `Document Category: ${docType}. Extract information:` },
-        {
-          type: 'image_url',
-          image_url: {
-            url: `data:${safeMime};base64,${base64Image}`
-          }
-        }
-      ]
-    });
-  } else {
-    // If it's plain text (e.g. virtual files) or PDF, parse it as text content
-    messages.push({
-      role: 'user',
-      content: `Document Category: ${docType}. Document Content: ${file.buffer.toString('utf8')}`
-    });
-  }
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: messages,
-    response_format: { type: "json_object" }
-  });
-
-  const content = response.choices[0].message.content;
-  return JSON.parse(content);
-}
+// OpenAI fallback disabled per user request
 
 // Mock fallback disabled per user request
 
