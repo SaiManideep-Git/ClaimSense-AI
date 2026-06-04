@@ -274,6 +274,29 @@ const createCanvasDocument = (
   });
 };
 
+// Fetch pre-generated high-fidelity PNG documents from server/public samples
+const fetchSampleDocument = async (
+  type: 'prescription' | 'bill',
+  tcId: string,
+  tc: any
+): Promise<File> => {
+  const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
+  const filename = `${tcId}_${capitalizedType}.png`;
+  const url = `/samples/${filename}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch static sample ${filename}: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    return new File([blob], filename, { type: 'image/png' });
+  } catch (err) {
+    console.warn(`Failed to fetch static sample ${filename}, falling back to canvas generation:`, err);
+    return createCanvasDocument(type, tcId, tc);
+  }
+};
+
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'submit' | 'history' | 'testsuite' | 'policy'>('submit');
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -356,16 +379,16 @@ export default function App() {
         setMemberJoinDate(input.member_join_date || '');
         setPreviousClaimsSameDay(String(input.previous_claims_same_day || 0));
 
-        // Generate real image files dynamically using canvas to allow real OCR
+        // Fetch pre-generated high-fidelity PNG files
         if (input.documents?.prescription) {
-          const presFile = await createCanvasDocument('prescription', id, tc);
+          const presFile = await fetchSampleDocument('prescription', id, tc);
           setPrescriptionFile(presFile);
         } else {
           setPrescriptionFile(null);
         }
 
         if (input.documents?.bill) {
-          const billFile = await createCanvasDocument('bill', id, tc);
+          const billFile = await fetchSampleDocument('bill', id, tc);
           setBillFile(billFile);
         } else {
           setBillFile(null);

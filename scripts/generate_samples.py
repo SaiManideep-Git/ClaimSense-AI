@@ -7,9 +7,11 @@ from PIL import Image, ImageDraw, ImageFont
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_CASES_PATH = os.path.join(BASE_DIR, 'server', 'test_cases.json')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'samples')
+CLIENT_OUTPUT_DIR = os.path.join(BASE_DIR, 'client', 'public', 'samples')
 
-# Ensure output directory exists
+# Ensure output directories exist
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(CLIENT_OUTPUT_DIR, exist_ok=True)
 
 # Font configurations (standard Windows fonts path)
 WIN_FONTS_DIR = os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts')
@@ -185,7 +187,9 @@ def generate_prescription(tc_id, tc_name, input_data):
     filename = f"{tc_id}_Prescription.png"
     filepath = os.path.join(OUTPUT_DIR, filename)
     img.save(filepath, 'PNG')
-    print(f"Saved: {filepath}")
+    client_filepath = os.path.join(CLIENT_OUTPUT_DIR, filename)
+    img.save(client_filepath, 'PNG')
+    print(f"Saved: {filepath} and {client_filepath}")
 
 def generate_bill(tc_id, tc_name, input_data):
     doc = input_data.get('documents', {}).get('bill')
@@ -307,7 +311,9 @@ def generate_bill(tc_id, tc_name, input_data):
     filename = f"{tc_id}_Bill.png"
     filepath = os.path.join(OUTPUT_DIR, filename)
     img.save(filepath, 'PNG')
-    print(f"Saved: {filepath}")
+    client_filepath = os.path.join(CLIENT_OUTPUT_DIR, filename)
+    img.save(client_filepath, 'PNG')
+    print(f"Saved: {filepath} and {client_filepath}")
 
 def run():
     print(f"Reading test cases definitions from: {TEST_CASES_PATH}")

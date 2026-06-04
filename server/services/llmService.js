@@ -79,25 +79,7 @@ async function extractDocumentData(file, docType, claimContext = {}) {
     }
   }
 
-  // Merge with mock extraction for test cases so that missing/empty fields on dummy files are populated
-  if (isTestCase) {
-    const mock = getMockExtraction(file, docType, testCaseId);
-    extracted = {
-      patientName: extracted.patientName || mock.patientName || claimContext.memberName,
-      hospitalName: extracted.hospitalName || mock.hospitalName || claimContext.hospital || '',
-      doctorName: extracted.doctorName || mock.doctorName || '',
-      doctorReg: extracted.doctorReg || mock.doctorReg || '',
-      consultationDate: extracted.consultationDate || mock.consultationDate || claimContext.treatmentDate,
-      claimAmount: extracted.claimAmount || mock.claimAmount || claimContext.claimAmount,
-      consultationFee: extracted.consultationFee || mock.consultationFee || 0,
-      medicines: (extracted.medicines && extracted.medicines.length) ? extracted.medicines : (mock.medicines || []),
-      tests: (extracted.tests && extracted.tests.length) ? extracted.tests : (mock.tests || []),
-      procedures: (extracted.procedures && extracted.procedures.length) ? extracted.procedures : (mock.procedures || []),
-      diagnosis: extracted.diagnosis || mock.diagnosis || '',
-      claimType: extracted.claimType || mock.claimType || 'OPD'
-    };
-  }
-
+  // Rely purely on live API extraction. Mock fallback is handled above if keys are missing or extraction fails.
   return extracted;
 }
 
