@@ -42,7 +42,7 @@ export default function App() {
   const [treatmentDate, setTreatmentDate] = useState('');
   const [claimAmount, setClaimAmount] = useState('');
   const [hospital, setHospital] = useState('');
-  const [cashlessRequest, setCashlessRequest] = useState(false);
+  const [preAuthId, setPreAuthId] = useState('');
   const [memberJoinDate, setMemberJoinDate] = useState('');
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [billFile, setBillFile] = useState<File | null>(null);
@@ -146,7 +146,7 @@ export default function App() {
     setTreatmentDate('');
     setClaimAmount('');
     setHospital('');
-    setCashlessRequest(false);
+    setPreAuthId('');
     setMemberJoinDate('');
     setPrescriptionFile(null);
     setBillFile(null);
@@ -204,7 +204,7 @@ export default function App() {
       formData.append('treatmentDate', treatmentDate);
       formData.append('claimAmount', claimAmount);
       formData.append('hospital', hospital);
-      formData.append('cashlessRequest', String(cashlessRequest));
+      formData.append('preAuthId', preAuthId);
       formData.append('memberJoinDate', memberJoinDate);
             if (prescriptionFile) {
         formData.append('prescription', prescriptionFile);
@@ -475,17 +475,22 @@ export default function App() {
                   )}
 
 
-                  {/* Pre-Authorization Cashless Switch */}
-                  <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850">
-                    <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-300 cursor-pointer">
+                  {/* Pre-Authorization Approval ID Input */}
+                  <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-2">
+                    <label className="text-xs text-slate-400 block font-semibold">Pre-Authorization Approval ID (Optional)</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                       <input
-                        type="checkbox"
-                        checked={cashlessRequest}
-                        onChange={e => setCashlessRequest(e.target.checked)}
-                        className="rounded bg-slate-900 border-slate-800 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
+                        type="text"
+                        value={preAuthId}
+                        onChange={e => setPreAuthId(e.target.value)}
+                        placeholder="e.g. PA-99999"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500"
                       />
-                      Pre-Authorization Cashless Request (Simulate Prior Approval)
-                    </label>
+                    </div>
+                    <span className="text-[10px] text-slate-500 block">
+                      *Required for diagnostic scans above ₹10,000. Enter any ID starting with <span className="text-brand-400 font-semibold font-mono">PA-</span> (e.g. <span className="font-mono text-emerald-400">PA-99999</span>) to simulate a valid prior approval.
+                    </span>
                   </div>
 
                   {/* Documents File Drag and Drop */}

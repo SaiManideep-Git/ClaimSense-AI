@@ -239,7 +239,11 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   const hasMRIorCT = containsKeyword(extractedData?.tests, ['mri', 'magnetic resonance', 'ct scan', 'computed tomography']) ||
                      containsKeyword(extractedData?.procedures, ['mri', 'ct scan']);
   if (hasMRIorCT) {
-    const isPreAuthApproved = claim.cashlessRequest || claim.cashless_request || claim.preAuthApproved;
+    const preAuthId = (claim.preAuthId || '').trim().toUpperCase();
+    const isPreAuthApproved = preAuthId.startsWith('PA-') || 
+                              preAuthId.startsWith('PREAUTH') || 
+                              claim.cashlessRequest || 
+                              claim.preAuthApproved;
     // Check if the claim amount is high (e.g., above 10000 as per test case 7) or if MRI always requires pre-auth
     if (!isPreAuthApproved && claimAmount >= 10000) {
       result.decision = 'REJECTED';

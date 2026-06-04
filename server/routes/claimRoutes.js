@@ -33,7 +33,8 @@ router.post('/submit', upload, async (req, res) => {
       hospital,
       cashlessRequest,
       memberJoinDate,
-      previousClaimsSameDay
+      previousClaimsSameDay,
+      preAuthId
     } = req.body;
 
     // Validate base inputs
@@ -145,7 +146,8 @@ router.post('/submit', upload, async (req, res) => {
       hospital,
       cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
       memberJoinDate: joinDateToUse,
-      previousClaimsSameDay: actualSameDayClaims
+      previousClaimsSameDay: actualSameDayClaims,
+      preAuthId: preAuthId || ''
     };
 
     console.log(`[Claim Submission] Processing claim for ${memberName} (${memberId}), amount: ₹${claimAmount}`);
@@ -258,6 +260,7 @@ router.post('/submit', upload, async (req, res) => {
       claimAmount: Number(claimAmount),
       hospital: aggregatedData.hospitalName || hospital,
       cashlessRequest: claimContext.cashlessRequest,
+      preAuthId: claimContext.preAuthId,
       documents: uploadedDocs,
       extractedData: aggregatedData,
       adjudication: ruleResult,

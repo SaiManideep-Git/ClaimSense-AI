@@ -29,6 +29,10 @@ const ClaimSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  preAuthId: {
+    type: String,
+    default: ''
+  },
   documents: {
     prescription: {
       url: String,
