@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, History, Sparkles, User, Calendar, CreditCard, Network, AlertCircle, Lock } from 'lucide-react';
+import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, History, Sparkles, User, Calendar, CreditCard, Network, AlertCircle, Lock, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 import { PolicyViewer } from './components/PolicyViewer';
 
 import { ClaimDetailsModal } from './components/ClaimDetailsModal';
@@ -45,6 +45,7 @@ export default function App() {
   const [cashlessRequest, setCashlessRequest] = useState(false);
   const [memberJoinDate, setMemberJoinDate] = useState('');
   const [previousClaimsSameDay, setPreviousClaimsSameDay] = useState('0');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [billFile, setBillFile] = useState<File | null>(null);
 
@@ -478,28 +479,48 @@ export default function App() {
                   )}
 
 
-                  {/* Switch & Advanced triggers */}
-                  <div className="flex flex-wrap gap-6 items-center bg-slate-950/40 p-4 rounded-xl border border-slate-850">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={cashlessRequest}
-                        onChange={e => setCashlessRequest(e.target.checked)}
-                        className="rounded bg-slate-900 border-slate-800 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
-                      />
-                      Pre-Authorization Cashless Request
-                    </label>
+                  {/* Advanced Options Accordion */}
+                  <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/20">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="w-full flex items-center justify-between p-3.5 text-xs font-semibold text-slate-300 hover:bg-slate-900/40 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Sliders className="w-3.5 h-3.5 text-brand-400" />
+                        <span>Advanced Policy Overrides (Simulation)</span>
+                      </span>
+                      {showAdvanced ? (
+                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
 
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
-                      <span className="text-slate-400">Previous Claims (Same Day):</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={previousClaimsSameDay}
-                        onChange={e => setPreviousClaimsSameDay(e.target.value)}
-                        className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-center text-xs focus:outline-none focus:border-brand-500"
-                      />
-                    </label>
+                    {showAdvanced && (
+                      <div className="p-4 border-t border-slate-850 bg-slate-950/40 flex flex-col sm:flex-row sm:items-center gap-6">
+                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={cashlessRequest}
+                            onChange={e => setCashlessRequest(e.target.checked)}
+                            className="rounded bg-slate-900 border-slate-800 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
+                          />
+                          Pre-Authorization Cashless Request
+                        </label>
+
+                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-300 cursor-pointer">
+                          <span className="text-slate-400">Previous Claims (Same Day):</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={previousClaimsSameDay}
+                            onChange={e => setPreviousClaimsSameDay(e.target.value)}
+                            className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-center text-xs focus:outline-none focus:border-brand-500"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
 
                   {/* Documents File Drag and Drop */}
