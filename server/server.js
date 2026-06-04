@@ -46,5 +46,4 @@ app.get('/', (req, res) => {
 // Start Server
 app.listen(PORT, () => {
   console.log(`[Server] Running on port ${PORT}...`);
-  console.log(`[Server] Test suite runner endpoint: http://localhost:${PORT}/api/claims/test-suite/run`);
 });
