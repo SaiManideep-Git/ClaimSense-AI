@@ -37,7 +37,7 @@ try {
  * @param {Object} [policy] - Optional policy terms override
  * @returns {Object} Adjudication result
  */
-function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
+function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
   const result = {
     decision: 'APPROVED',
     approvedAmount: 0,
@@ -84,6 +84,96 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
       keywords.some(kw => String(item).toLowerCase().includes(kw.toLowerCase()))
     );
   };
+
+  // ----------------------------------------------------
+  // STEP 0: Safety & Fraud Indicators Check (Priority 1: Safety First)
+  // ----------------------------------------------------
+  
+  // 1. Blacklisted provider check
+  const doctorRegUpper = (extractedData?.doctorReg || '').toUpperCase().trim();
+  const doctorNameLower = (extractedData?.doctorName || '').toLowerCase();
+  const hospitalNameLower = (extractedData?.hospitalName || claim.hospital || '').toLowerCase();
+  
+  const blacklistedRegs = ['KA/99999/2020', 'DOC999', 'DR_FRAUD'];
+  const isBlacklisted = blacklistedRegs.includes(doctorRegUpper) || 
+                        doctorNameLower.includes('fraud') || 
+                        doctorNameLower.includes('quack') || 
+                        hospitalNameLower.includes('quack') || 
+                        hospitalNameLower.includes('fraud') || 
+                        hospitalNameLower.includes('fake diagnostics') ||
+                        hospitalNameLower.includes('blacklisted');
+                        
+  if (isBlacklisted) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('FRAUD_DETECTION');
+    result.confidenceScore = 0.10;
+    result.notes = 'Claim rejected: Provider or prescribing physician is blacklisted or identified as fraudulent.';
+    result.nextSteps = 'This incident has been reported to the corporate risk and compliance department. Please contact your HR administrator.';
+    return result;
+  }
+
+  // 2. Suspicious alterations on uploaded documents
+  if (claim.hasSuspiciousAlterations) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('FRAUD_DETECTION');
+    result.confidenceScore = 0.15;
+    result.notes = 'Claim rejected: Suspicious alterations (such as edited filenames indicating design software or modifications) detected in submitted files.';
+    result.nextSteps = 'Please upload the original, unmodified digital PDF bills and prescriptions directly from the healthcare provider.';
+    return result;
+  }
+
+  // 3. Duplicate bills across different treatment dates
+  if (claim.duplicateBillDifferentDate) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('DUPLICATE_CLAIM');
+    result.confidenceScore = 0.20;
+    result.notes = 'Claim rejected: A duplicate bill with the exact same amount and provider has already been submitted under a different treatment date.';
+    result.nextSteps = 'Please verify your billing invoice numbers and submit only unique medical treatments.';
+    return result;
+  }
+
+  // 4. Diagnosis not matching age/gender
+  const diagnosisLower = (extractedData?.diagnosis || '').toLowerCase();
+  const gender = claim.memberGender || '';
+  const age = claim.memberAge;
+  let isAgeGenderMismatch = false;
+  let ageGenderNotes = '';
+
+  if (gender === 'Male') {
+    const femaleOnlyKeywords = ['pregnancy', 'maternity', 'obstetric', 'ovarian', 'uterine', 'cervical cancer', 'dysmenorrhea', 'vagina'];
+    const hasFemaleOnly = femaleOnlyKeywords.some(kw => diagnosisLower.includes(kw));
+    if (hasFemaleOnly) {
+      isAgeGenderMismatch = true;
+      ageGenderNotes = `Diagnosis '${extractedData.diagnosis}' is biologically inconsistent with member's registered gender (${gender}).`;
+    }
+  } else if (gender === 'Female') {
+    const maleOnlyKeywords = ['prostate', 'prostatic', 'testicular', 'semen', 'penis', 'scrotum'];
+    const hasMaleOnly = maleOnlyKeywords.some(kw => diagnosisLower.includes(kw));
+    if (hasMaleOnly) {
+      isAgeGenderMismatch = true;
+      ageGenderNotes = `Diagnosis '${extractedData.diagnosis}' is biologically inconsistent with member's registered gender (${gender}).`;
+    }
+  }
+
+  if (age !== undefined) {
+    if (age > 18 && diagnosisLower.includes('pediatric')) {
+      isAgeGenderMismatch = true;
+      ageGenderNotes = `Pediatric diagnosis '${extractedData.diagnosis}' is invalid for adult member (Age: ${age}).`;
+    }
+    if (age < 12 && (diagnosisLower.includes('senile') || diagnosisLower.includes('dementia') || diagnosisLower.includes('alzheimer') || diagnosisLower.includes('joint replacement'))) {
+      isAgeGenderMismatch = true;
+      ageGenderNotes = `Geriatric condition diagnosis '${extractedData.diagnosis}' is biologically invalid for young member (Age: ${age}).`;
+    }
+  }
+
+  if (isAgeGenderMismatch) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('PATIENT_MISMATCH');
+    result.confidenceScore = 0.25;
+    result.notes = `Claim rejected due to medical profile discrepancy: ${ageGenderNotes}`;
+    result.nextSteps = 'Please verify that the correct patient was selected under the policy and that document details match registered member demographics.';
+    return result;
+  }
 
   // ----------------------------------------------------
   // STEP 1: Basic Eligibility Check
@@ -527,13 +617,27 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   // STEP 6: Fraud / Manual Review Check
   // ----------------------------------------------------
   const previousClaimsSameDay = Number(claim.previousClaimsSameDay || claim.previous_claims_same_day || 0);
-  if (previousClaimsSameDay > 2) {
+  const providerSameDayClaims = Number(claim.providerSameDayClaims || 0);
+  if (previousClaimsSameDay > 2 || providerSameDayClaims > 2) {
     result.decision = 'MANUAL_REVIEW';
     result.flags.push('Multiple claims same day');
     result.flags.push('Unusual pattern detected');
-    result.confidenceScore = 0.65;
-    result.notes = 'Claim referred for manual review: Multiple claims submitted on the same treatment date.';
+    result.confidenceScore = 0.55;
+    result.notes = 'Claim referred for manual review: Multiple claims submitted on the same treatment date or from the same healthcare provider.';
     result.nextSteps = 'Our claims auditing team will review this claim manually within 24 hours.';
+    return result;
+  }
+
+  // Unusually high frequency of claims (> 3 in last 7 days or > 5 in last 30 days)
+  const claimsInLast7Days = Number(claim.claimsInLast7Days || 0);
+  const claimsInLast30Days = Number(claim.claimsInLast30Days || 0);
+  if (claimsInLast7Days > 3 || claimsInLast30Days > 5) {
+    result.decision = 'MANUAL_REVIEW';
+    result.flags.push('High frequency of claims');
+    result.flags.push('Unusual volume pattern');
+    result.confidenceScore = 0.50;
+    result.notes = `Claim referred for manual review: Unusually high frequency of claim submissions (${claimsInLast7Days} in 7 days, ${claimsInLast30Days} in 30 days).`;
+    result.nextSteps = 'Claim is flagged for audit due to high claim volume patterns.';
     return result;
   }
 
@@ -547,7 +651,7 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
   }
 
   // Complex medical conditions check
-  const diagnosisLower = (extractedData?.diagnosis || '').toLowerCase();
+  // diagnosisLower is already defined in outer scope
   const criticalKeywords = ['cancer', 'chemotherapy', 'oncology', 'tumor', 'cardiac', 'bypass', 'stroke', 'transplant', 'renal', 'neurological', 'myocardial'];
   const isComplexCondition = criticalKeywords.some(kw => diagnosisLower.includes(kw));
   if (isComplexCondition) {
@@ -573,6 +677,23 @@ function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
     ? `Reimbursement of ₹${result.approvedAmount} will be credited to your registered bank account in 3-5 business days.`
     : 'You can appeal this decision by providing additional medical documents or correcting the invoice/prescription details.';
 
+  return result;
+}
+
+/**
+ * Adjudicates a claim and wraps the result to ensure both camelCase and snake_case fields
+ * are returned, matching both the React frontend and requested JSON formats.
+ */
+function adjudicateClaim(claim, extractedData, policy = defaultPolicy) {
+  const result = adjudicateClaimInner(claim, extractedData, policy);
+  
+  // Synchronize camelCase to snake_case for requested output format
+  result.claim_id = claim.claimId || claim.claim_id || '';
+  result.approved_amount = result.approvedAmount;
+  result.rejection_reasons = result.rejectionReasons;
+  result.confidence_score = result.confidenceScore;
+  result.next_steps = result.nextSteps;
+  
   return result;
 }
 

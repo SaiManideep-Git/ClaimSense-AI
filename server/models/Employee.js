@@ -23,6 +23,15 @@ const EmployeeSchema = new mongoose.Schema({
     enum: ['Active', 'Terminated'],
     default: 'Active'
   },
+  age: {
+    type: Number,
+    required: false
+  },
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other'],
+    required: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

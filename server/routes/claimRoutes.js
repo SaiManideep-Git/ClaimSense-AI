@@ -120,6 +120,24 @@ router.post('/submit', upload, async (req, res) => {
       return res.status(201).json(newClaim);
     }
 
+    // We will initialize file structures first, then compute fraud check queries,
+    // and then construct claimContext below.
+
+    console.log(`[Claim Submission] Processing claim for ${memberName} (${memberId}), amount: ₹${claimAmount}`);
+
+    // Files mapping
+    const prescriptionFile = req.files?.['prescription']?.[0];
+    const billFile = req.files?.['bill']?.[0];
+    const reportFiles = req.files?.['reports'] || [];
+
+    // Check if at least one file was uploaded
+    if (!prescriptionFile && !billFile) {
+      return res.status(400).json({ error: 'Missing document files. Upload at least a prescription or a bill.' });
+    }
+
+    // Generate claim ID early for rules engine
+    const generatedClaimId = `CLM_${Math.floor(100000 + Math.random() * 900000)}`;
+
     // Calculate same-day claims automatically from database
     let actualSameDayClaims = 0;
     try {
@@ -138,7 +156,76 @@ router.post('/submit', upload, async (req, res) => {
       console.error('[Claim Submission] Error calculating same-day claims count:', dbErr.message);
     }
 
+    // Fraud check 1: Unusually high frequency of claims (> 3 in last 7 days or > 5 in last 30 days)
+    let claimsInLast7Days = 0;
+    let claimsInLast30Days = 0;
+    try {
+      const now = new Date();
+      const startOf7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const startOf30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      claimsInLast7Days = await Claim.countDocuments({ memberId, createdAt: { $gte: startOf7Days } });
+      claimsInLast30Days = await Claim.countDocuments({ memberId, createdAt: { $gte: startOf30Days } });
+    } catch (err) {
+      console.error('[Claim Submission] Error counting claims frequency:', err.message);
+    }
+
+    // Fraud check 2: Multiple claims from same provider on same day
+    let providerSameDayClaims = 0;
+    try {
+      if (hospital) {
+        const startOfDay = new Date(treatmentDate);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        const endOfDay = new Date(treatmentDate);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        providerSameDayClaims = await Claim.countDocuments({
+          hospital: new RegExp(`^${hospital.trim()}$`, 'i'),
+          treatmentDate: { $gte: startOfDay, $lte: endOfDay }
+        });
+      }
+    } catch (err) {
+      console.error('[Claim Submission] Error counting provider same day claims:', err.message);
+    }
+
+    // Fraud check 3: Duplicate bills across different dates
+    let duplicateBillDifferentDate = false;
+    try {
+      if (claimAmount && hospital) {
+        const duplicateDiffDate = await Claim.findOne({
+          memberId,
+          claimAmount: Number(claimAmount),
+          hospital: new RegExp(`^${hospital.trim()}$`, 'i'),
+          treatmentDate: { $ne: new Date(treatmentDate) },
+          status: { $ne: 'rejected' }
+        });
+        if (duplicateDiffDate) {
+          duplicateBillDifferentDate = true;
+        }
+      }
+    } catch (err) {
+      console.error('[Claim Submission] Error checking duplicate bills diff dates:', err.message);
+    }
+
+    // Fraud check 4: Suspicious alterations based on filenames
+    let hasSuspiciousAlterations = false;
+    const suspiciousKeywords = ['edit', 'alter', 'modify', 'photoshop', 'forged', 'fake', 'hacked', 'patch'];
+    const checkSuspicious = (filename) => {
+      if (!filename) return false;
+      return suspiciousKeywords.some(kw => filename.toLowerCase().includes(kw));
+    };
+    if (prescriptionFile && checkSuspicious(prescriptionFile.originalname)) {
+      hasSuspiciousAlterations = true;
+    }
+    if (billFile && checkSuspicious(billFile.originalname)) {
+      hasSuspiciousAlterations = true;
+    }
+    for (const file of reportFiles) {
+      if (checkSuspicious(file.originalname)) {
+        hasSuspiciousAlterations = true;
+      }
+    }
+
     const claimContext = {
+      claimId: generatedClaimId,
       memberId,
       memberName,
       treatmentDate,
@@ -147,20 +234,15 @@ router.post('/submit', upload, async (req, res) => {
       cashlessRequest: cashlessRequest === 'true' || cashlessRequest === true,
       memberJoinDate: joinDateToUse,
       previousClaimsSameDay: actualSameDayClaims,
+      claimsInLast7Days,
+      claimsInLast30Days,
+      providerSameDayClaims,
+      duplicateBillDifferentDate,
+      hasSuspiciousAlterations,
+      memberGender: employee.gender,
+      memberAge: employee.age,
       preAuthId: preAuthId || ''
     };
-
-    console.log(`[Claim Submission] Processing claim for ${memberName} (${memberId}), amount: ₹${claimAmount}`);
-
-    // Files mapping
-    const prescriptionFile = req.files?.['prescription']?.[0];
-    const billFile = req.files?.['bill']?.[0];
-    const reportFiles = req.files?.['reports'] || [];
-
-    // Check if at least one file was uploaded
-    if (!prescriptionFile && !billFile) {
-      return res.status(400).json({ error: 'Missing document files. Upload at least a prescription or a bill.' });
-    }
 
     // 1. Upload files to Storage (Cloudinary or local)
     const uploadedDocs = {
@@ -269,7 +351,7 @@ router.post('/submit', upload, async (req, res) => {
 
     // 5. Store claim record in database
     const newClaim = new Claim({
-      claimId: `CLM_${Math.floor(100000 + Math.random() * 900000)}`,
+      claimId: generatedClaimId,
       memberId,
       memberName,
       treatmentDate: new Date(treatmentDate),

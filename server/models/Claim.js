@@ -86,12 +86,23 @@ const ClaimSchema = new mongoose.Schema({
     },
     rejectedItems: [String],
     rejectionReasons: [String],
+    rejection_reasons: [String],
     flags: [String],
     notes: String,
     nextSteps: String,
+    next_steps: String,
     confidenceScore: {
       type: Number,
       default: 1.0
+    },
+    confidence_score: {
+      type: Number,
+      default: 1.0
+    },
+    claim_id: String,
+    approved_amount: {
+      type: Number,
+      default: 0
     }
   },
   status: {

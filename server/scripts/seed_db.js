@@ -28,16 +28,16 @@ const policyData = {
 };
 
 const employeesData = [
-  { memberId: "EMP001", name: "Rajesh Kumar", joinDate: new Date("2024-01-15T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP002", name: "Priya Singh", joinDate: new Date("2024-02-10T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP003", name: "Amit Verma", joinDate: new Date("2024-03-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP004", name: "Sneha Reddy", joinDate: new Date("2024-04-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP005", name: "Vikram Joshi", joinDate: new Date("2024-09-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP006", name: "Kavita Nair", joinDate: new Date("2024-05-15T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP007", name: "Suresh Patil", joinDate: new Date("2024-06-20T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP008", name: "Ravi Menon", joinDate: new Date("2024-07-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP009", name: "Anita Desai", joinDate: new Date("2024-01-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" },
-  { memberId: "EMP010", name: "Deepak Shah", joinDate: new Date("2024-08-15T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active" }
+  { memberId: "EMP001", name: "Rajesh Kumar", joinDate: new Date("2024-01-15T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 34, gender: "Male" },
+  { memberId: "EMP002", name: "Priya Singh", joinDate: new Date("2024-02-10T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 28, gender: "Female" },
+  { memberId: "EMP003", name: "Amit Verma", joinDate: new Date("2024-03-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 45, gender: "Male" },
+  { memberId: "EMP004", name: "Sneha Reddy", joinDate: new Date("2024-04-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 31, gender: "Female" },
+  { memberId: "EMP005", name: "Vikram Joshi", joinDate: new Date("2024-09-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 29, gender: "Male" },
+  { memberId: "EMP006", name: "Kavita Nair", joinDate: new Date("2024-05-15T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 27, gender: "Female" },
+  { memberId: "EMP007", name: "Suresh Patil", joinDate: new Date("2024-06-20T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 50, gender: "Male" },
+  { memberId: "EMP008", name: "Ravi Menon", joinDate: new Date("2024-07-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 40, gender: "Male" },
+  { memberId: "EMP009", name: "Anita Desai", joinDate: new Date("2024-01-01T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 35, gender: "Female" },
+  { memberId: "EMP010", name: "Deepak Shah", joinDate: new Date("2024-08-15T00:00:00Z"), policyId: "PLUM_OPD_2024", status: "Active", age: 26, gender: "Male" }
 ];
 
 const seed = async () => {
