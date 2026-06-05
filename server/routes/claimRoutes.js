@@ -276,10 +276,12 @@ router.post('/submit', upload, async (req, res) => {
     if (prescriptionFile) {
       prescriptionExtracted = await extractDocumentData(prescriptionFile, 'prescription', claimContext);
       uploadedDocs.prescription.extractedText = JSON.stringify(prescriptionExtracted);
+      console.log('[Claim Submission] Successfully extracted data from prescription:', JSON.stringify(prescriptionExtracted, null, 2));
     }
     if (billFile) {
       billExtracted = await extractDocumentData(billFile, 'bill', claimContext);
       uploadedDocs.bill.extractedText = JSON.stringify(billExtracted);
+      console.log('[Claim Submission] Successfully extracted data from bill:', JSON.stringify(billExtracted, null, 2));
     }
     if (reportFiles.length > 0) {
       try {
