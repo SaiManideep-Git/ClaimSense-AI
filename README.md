@@ -1,6 +1,72 @@
-# ClaimSense AI - OPD Claim Adjudication Platform
+# ClaimSense AI — Automated Insurance Claims Adjudication Platform
 
-ClaimSense AI is an intelligent full-stack claims auditing system designed to automate the approval, partial deduction, and rejection of Outpatient Department (OPD) medical insurance claims. By integrating advanced OCR and generative AI (Gemini/OpenAI) with a deterministic rules engine, it transforms slow manual audits into a real-time policy evaluation dashboard.
+ClaimSense AI is a premium, full-stack claims auditing platform designed to automate the ingestion, validation, and adjudication of Outpatient Department (OPD) medical insurance claims. 
+
+By pairing advanced multimodal LLM vision OCR (Groq & Gemini) with a highly customized, deterministic policy rules engine, ClaimSense AI eliminates manual paper processing, detects invoice fraud, validates medical necessity, and computes payouts in real time.
+
+---
+
+## 🎨 System Architecture & Adjudication Pipeline
+
+```mermaid
+graph TD
+    Start[Claimant submits claim details in UI] --> Upload[Upload Prescription / Bill / Report]
+    Upload --> BackendCheck[Backend: Verify Member Eligibility]
+    BackendCheck -->|Not Covered / Status: Terminated| Reject1[REJECT: MEMBER_NOT_COVERED]
+    BackendCheck -->|Covered & Active| DupCheck[Check DB: Duplicate Claim Check]
+    DupCheck -->|Found match with same amount & date| Reject2[REJECT: DUPLICATE_CLAIM]
+    DupCheck -->|Unique| LLMOCR[LLM OCR: Ingest files using Groq / Gemini]
+    LLMOCR --> SafetyChecks{Step 0: Safety & Fraud Checks}
+    
+    SafetyChecks -->|Altered files / Blacklisted doctor / Demographics mismatch| Reject3[REJECT: FRAUD_DETECTION / PATIENT_MISMATCH]
+    SafetyChecks -->|Invoice Math error / Claim mismatch / Double-counting| Reject4[REJECT: FRAUD_DETECTION]
+    SafetyChecks -->|Clear / Valid| PolicyActive{Step 1: Check Active Policy Window}
+    
+    PolicyActive -->|Outside date range| Reject5[REJECT: POLICY_INACTIVE]
+    PolicyActive -->|Inside window| WaitingCheck{Step 1.5: Waiting Periods Check}
+    
+    WaitingCheck -->|In initial 30d or chronic 90d window| Reject6[REJECT: WAITING_PERIOD]
+    WaitingCheck -->|Cleared| TimelineCheck{Step 2: Submission Timeline Check}
+    
+    TimelineCheck -->|Submitted >30 days post-treatment| Reject7[REJECT: LATE_SUBMISSION]
+    TimelineCheck -->|Valid| ScanCheck{Step 3: Medical Necessity Scan Check}
+    
+    ScanCheck -->|Prescribed scan but missing report| Reject8[REJECT: MISSING_DOCUMENTS]
+    ScanCheck -->|Broad match report uploaded| CategoryLimits[Step 4: Evaluate Category Sub-limits]
+    
+    CategoryLimits --> ExclusionsCheck[Step 4.5: Excluded items deduction]
+    ExclusionsCheck --> NetworkCheck{Step 5: Hospital Provider Check}
+    
+    NetworkCheck -->|Network Hospital e.g. Apollo| PayoutNetwork[Insurer Benefit Applied: 0% Copay / 100% Payout]
+    NetworkCheck -->|Non-Network Hospital| PayoutNonNetwork[Co-payment Applied: 10% Deduction / 90% Payout]
+    
+    PayoutNetwork --> ManualReviewCheck{Step 6: High Frequency / High Value Checks}
+    PayoutNonNetwork --> ManualReviewCheck
+    
+    ManualReviewCheck -->|Exceeds 25k / Multi-claims same day / Frequency alert| MR[MANUAL_REVIEW]
+    ManualReviewCheck -->|Standard Claim| Decide[APPROVED / PARTIAL]
+    
+    MR --> Save[Save to MongoDB & return adjudication outcome]
+    Decide --> Save
+```
+
+---
+
+## ⚡ Key Features
+
+*   **Multimodal LLM OCR Ingestion (Groq & Gemini)**: Extracts structured text (patient name, diagnostic findings, line items, doctor registration) directly from uploaded files.
+*   **Sequential Pacing & Rate-Limiting Delays**: Backend document extraction introduces a `1500ms` sleep delay between files and incorporates exponential backoff retries to prevent triggering API rate limits.
+*   **Resilient Cascade Fallback Chain**: 
+    1.  **Primary**: Live Groq API (`meta-llama/llama-4-scout-17b-16e-instruct` Vision).
+    2.  **Secondary**: Live Gemini API (`gemini-2.5-flash` Vision).
+    3.  **Tertiary**: Local mock fallback matching `test_cases.json` scenario variables.
+*   **Safety & Fraud Detection**:
+    *   **Demographic checks**: Catches gender/age discrepancies (e.g. pregnancy diagnosis on males, senile dementia on children).
+    *   **Invoice Math Audits**: Programmatically matches sum of itemized lines against invoice subtotal, taxes, and final payable amount.
+    *   **Double-Counting Audit**: Detects if category headers and individual line items are concurrently added to inflate the bill.
+    *   **Blacklist Matching**: Detects registered doctor IDs and names associated with fraud or fake stamps.
+*   **Admin Override & Audit Ledger**: Admin dashboard with filters, manual adjudication status overrides, and a toggleable TechCorp Employee Directory.
+*   **Document Preview Modal**: Interactive previews for uploaded images and PDFs, featuring automatic blob memory management.
 
 ---
 
@@ -9,7 +75,12 @@ ClaimSense AI is an intelligent full-stack claims auditing system designed to au
 ```
 ClaimSense-AI/
 ├── client/                     # Vite + React + TypeScript + Tailwind CSS Frontend
-├── server/                     # Node.js + Express + Mongoose + Multer Backend
+├── server/                     # Node.js + Express + Mongoose Backend
+│   ├── models/                 # MongoDB Mongoose Schemas (Claim, Employee, Policy)
+│   ├── routes/                 # API Routes (claimRoutes.js)
+│   ├── scripts/                # Database Seeder (seed_db.js) & Test Runner (test_runner.js)
+│   ├── services/               # Rules Engine (rulesEngine.js) & LLM Client (llmService.js)
+│   └── test_cases.json         # Backend Test Cases reference file
 └── plum_intern_assignment/     # Assignment instructions and policy terms reference data
 ```
 
@@ -17,68 +88,80 @@ ClaimSense-AI/
 
 ## 🚀 Getting Started
 
-To run the application locally, follow these simple setup steps.
+Follow these steps to run the frontend and backend locally.
 
 ### 1. Prerequisites
-- **Node.js** (v18 or higher)
-- **MongoDB** (A running local MongoDB instance or a MongoDB Atlas connection string)
-- **Gemini API Key** or **OpenAI API Key** (optional - the system implements a smart mock fallback that loads local test cases automatically if no keys are configured)
+*   **Node.js** (v18 or higher)
+*   **MongoDB** (Local instance or MongoDB Atlas cluster connection string)
+*   **API Key**: Groq API Key or Gemini API Key (Optional — fallback is enabled)
 
 ---
 
-### 2. Backend Setup (`/server`)
+### 2. Environment Configuration (`/server/.env`)
 
-1. Open your terminal and navigate to the server folder:
-   ```bash
-   cd server
-   ```
-2. Copy the environment template to create your active `.env` file:
-   ```bash
-   cp .env.example .env
-   ```
-3. (Optional) Configure your `.env` variables:
-   - Connect to MongoDB Atlas: Update `MONGODB_URI`. If left blank, it defaults to a local connection (`mongodb://localhost:27017/claimsense`).
-   - Configure OCR/Vision: Set `GEMINI_API_KEY` (highly recommended for native PDF support) or `OPENAI_API_KEY`. If left blank, the server runs in Demo mode, using mock extractions matching the test cases.
-   - Configure Cloudinary: Set Cloudinary variables for cloud image storage. If left blank, the server will save files locally to `server/uploads/` and serve them statically.
-4. Install dependencies:
-   ```bash
-   npm install
-   ```
-5. Start the backend development server:
-   ```bash
-   npm run dev
-   ```
-   The backend server will run at `http://localhost:5000`.
+1.  Navigate to the server folder and copy the environment template:
+    ```bash
+    cd server
+    cp .env.example .env
+    ```
+2.  Configure your environment variables in `.env`:
+    *   `MONGODB_URI`: Connect to a local MongoDB database (`mongodb://localhost:27017/claimsense`) or Atlas cluster.
+    *   `GROQ_API_KEY`: Provide your Groq key.
+    *   `GEMINI_API_KEY`: Provide your Gemini key (secondary fallback).
+    *   `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`: (Optional) Connect Cloudinary for file storage. If left blank, documents will save locally under `server/uploads/`.
 
 ---
 
-### 3. Frontend Setup (`/client`)
+### 3. Backend Setup & DB Seeding
 
-1. Open a new terminal window and navigate to the client folder:
-   ```bash
-   cd client
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   The frontend application will be active at `http://localhost:5173`.
+1.  Install dependencies:
+    ```bash
+    npm install
+    ```
+2.  Seed the MongoDB database with default policies, network hospitals, and employee directory profiles:
+    ```bash
+    npm run seed
+    ```
+3.  Start the backend development server:
+    ```bash
+    npm run dev
+    ```
+    The server will run on `http://localhost:5000`.
 
 ---
 
-## 🧪 Adjudication & Rules Architecture
+### 4. Run the Automated Test Suite
 
-The system executes audits in a multi-stage validation pipeline:
-1. **File Ingestion**: Uploads prescriptions and invoices (supports image formats and PDFs).
-2. **Metadata OCR Extraction**: Uses LLM vision (Gemini/OpenAI) to extract structured fields (doctor registration, consultation date, line items, diagnosis, claim amount).
-3. **Deterministic Rules Engine**: Calculates policy limits against terms:
-   - **Copay Check**: Applies a 10% patient copay for non-network clinics.
-   - **Network Discount**: Applies a 20% network discount for claims treated at network hospitals (Apollo, Fortis, Max, Manipal, Narayana).
-   - **Waiting Periods**: Rejects diabetes and hypertension treatments if member joining date is less than 90 days prior to treatment.
-   - **Exclusions Check**: Automatically rejects cosmetic procedures (e.g. teeth whitening) or obesity diet treatments.
-   - **Fraud Flags**: Reroutes claims to `MANUAL_REVIEW` if a user files more than 2 claims on the same day.
-4. **Member Appeals Portal**: Enables members to submit manual appeals on rejected or partial decisions, escalating the claim to a review status.
+We have integrated the automated test suite directly into `npm test` so you can verify the rules engine rules instantly:
+```bash
+npm test
+```
+This script evaluates the rules engine logic against all 10 historical test cases and prints a pass/fail matrix, checking for copays, category limits, waiting periods, fraud flags, and network hospital calculations.
+
+---
+
+### 5. Frontend Setup
+
+1.  Open a new terminal window and navigate to the client folder:
+    ```bash
+    cd ../client
+    npm install
+    ```
+2.  Start the Vite development server:
+    ```bash
+    npm run dev
+    ```
+    Open your browser to `http://localhost:5173`.
+
+---
+
+## 🏥 Policy Rules & Claim Processing Guidelines
+
+*   **Co-payment & Network Discount**:
+    *   **Network Hospital** (Apollo, Fortis, Max, Manipal, Narayana): Applies **0% co-payment** and **20% provider discount** (Insurer benefit). The member receives a **100% full reimbursement** of eligible base costs.
+    *   **Non-Network Hospital**: Applies a **10% co-payment deduction** from the member's reimbursement payout.
+*   **Waiting Periods**:
+    *   **Initial**: 30 days from joining date (covers accidental emergency treatments only).
+    *   **Chronic (Diabetes / Hypertension)**: 90 days from joining date.
+*   **Exclusions**: Cosmetic procedures (e.g. teeth whitening) and weight loss/obesity treatments are programmatically detected and deducted from the eligible claim amount.
+*   **Diagnostics Scan Verification**: Scan charges (MRI, CT Scan, X-ray, Ultrasound, CBC, ECG) require matching diagnostic reports. Mismatching patient names, incorrect test types, or missing reports trigger rejection.
