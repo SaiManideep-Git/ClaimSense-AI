@@ -34,7 +34,8 @@ router.post('/submit', upload, async (req, res) => {
       cashlessRequest,
       memberJoinDate,
       previousClaimsSameDay,
-      preAuthId
+      preAuthId,
+      submissionDate
     } = req.body;
 
     // Validate base inputs
@@ -241,7 +242,8 @@ router.post('/submit', upload, async (req, res) => {
       hasSuspiciousAlterations,
       memberGender: employee.gender,
       memberAge: employee.age,
-      preAuthId: preAuthId || ''
+      preAuthId: preAuthId || '',
+      submissionDate: submissionDate || null
     };
 
     // 1. Upload files to Storage (Cloudinary or local)

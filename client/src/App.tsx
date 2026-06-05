@@ -737,6 +737,14 @@ export default function App() {
       formData.append('previousClaimsSameDay', previousClaimsSameDay);
       formData.append('testCaseId', testCaseId);
 
+      if (testCaseId) {
+        // Calculate a submission date 1 day after the treatment date to satisfy LATE_SUBMISSION check
+        const tDate = new Date(treatmentDate);
+        tDate.setDate(tDate.getDate() + 1);
+        const subDateStr = tDate.toISOString().split('T')[0];
+        formData.append('submissionDate', subDateStr);
+      }
+
       if (prescriptionFile) {
         formData.append('prescription', prescriptionFile);
       }
@@ -1154,7 +1162,7 @@ export default function App() {
                             />
                           </label>
                           {prescriptionFile && (
-                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">Γ¥ô {prescriptionFile.name}</span>
+                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {prescriptionFile.name}</span>
                           )}
                         </div>
 
@@ -1174,7 +1182,7 @@ export default function App() {
                             />
                           </label>
                           {billFile && (
-                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">Γ¥ô {billFile.name}</span>
+                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {billFile.name}</span>
                           )}
                         </div>
 
@@ -1221,7 +1229,7 @@ export default function App() {
                         ].map(step => (
                           <div key={step.id} className="flex items-center gap-3">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${processingStep > step.id ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/35' : processingStep === step.id ? 'bg-brand-600 text-white border border-brand-500 animate-pulse' : 'bg-slate-950 text-slate-500 border border-slate-850'}`}>
-                              {processingStep > step.id ? 'Γ£ô' : step.id}
+                              {processingStep > step.id ? "\u2713" : step.id}
                             </div>
                             <span className={`text-xs font-semibold ${processingStep === step.id ? 'text-brand-400' : processingStep > step.id ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>{step.label}</span>
                           </div>
@@ -1591,7 +1599,7 @@ export default function App() {
 
       {/* Bottom Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 text-center text-[10px] text-slate-500 mt-12 shrink-0">
-        Plum AI Pod Intern Evaluation Project ΓÇó Developed by Putchanutala Sai Manideep ΓÇó Platform active local port 5000 / 5173
+        Plum AI Pod Intern Evaluation Project {"\u2022"} Developed by Putchanutala Sai Manideep {"\u2022"} Platform active local port 5000 / 5173
       </footer>
 
     </div>

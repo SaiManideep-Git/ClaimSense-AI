@@ -15,7 +15,7 @@ const policyData = {
   policyId: "PLUM_OPD_2024",
   companyName: "TechCorp Solutions Pvt Ltd",
   effectiveDate: new Date("2024-01-01T00:00:00Z"),
-  expirationDate: new Date("2024-12-31T23:59:59Z"),
+  expirationDate: new Date("2028-12-31T23:59:59Z"),
   annualLimit: 50000,
   perClaimLimit: 5000,
   copayPercentage: 10,
