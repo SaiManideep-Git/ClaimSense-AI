@@ -18,7 +18,10 @@ const extractionSchema = {
   findings: "For reports: clinical findings, lab observations, or diagnostic impression (e.g. L4-L5 disc bulge, normal blood counts, clear chest)",
   claimType: "Strictly one of: 'OPD' (general consultation/pharmacy/report), 'Dental', 'Vision', 'Alternative' (Ayurveda/Homeopathy)",
   invoiceMathValid: "Boolean: Perform strict mathematical validation. Sum all individual itemized fees, taxes, and discounts on the bill. Does their sum match the printed subtotal and net payable total? Return false if there is a calculation error, double-counting, or inconsistency. Set to true if the math is correct.",
-  invoiceMathDetails: "String: If invoiceMathValid is false, write a detailed explanation of the arithmetic discrepancy or double-counting (e.g., 'Subtotal (2000) + CGST/SGST (360) does not equal Net Payable Total (1500)'). Otherwise, return null."
+  invoiceMathDetails: "String: If invoiceMathValid is false, write a detailed explanation of the arithmetic discrepancy or double-counting (e.g., 'Subtotal (2000) + CGST/SGST (360) does not equal Net Payable Total (1500)'). Otherwise, return null.",
+  reportedSubtotal: "Number: The subtotal amount printed on the invoice bill (if present, otherwise 0). E.g. 2000.00.",
+  reportedTax: "Number: The total tax amount (CGST + SGST or other tax rows added together) printed on the invoice bill (if present, otherwise 0). E.g. 360.00.",
+  reportedNetPayable: "Number: The final net payable total printed on the invoice bill (if present, otherwise 0). E.g. 1500.00."
 };
 
 // System Prompt for structured vision extraction
@@ -36,7 +39,8 @@ Important Rules:
    - 'Alternative': Ayurveda, Homeopathy, Vaidya clinics.
    - 'OPD': Any general physician, general pharmacy, or routine diagnostic checks (like blood tests).
 5. Normalize the doctorReg number if possible, ensuring it captures the state/number/year structure.
-6. Pay extreme attention to the mathematics on invoice bills. Verify that the sum of consultation fees, test charges, medicines, etc. plus taxes equals the final net payable total. If it does not, set invoiceMathValid to false and describe the error in invoiceMathDetails.`;
+6. Pay extreme attention to the mathematics on invoice bills. Verify that the sum of consultation fees, test charges, medicines, etc. plus taxes equals the final net payable total. If it does not, set invoiceMathValid to false and describe the error in invoiceMathDetails.
+7. Be sure to extract the printed subtotal (reportedSubtotal), the printed tax amount (reportedTax), and the printed final total (reportedNetPayable) as numbers.`;
 
 /**
  * Helper to load test case mock data from local test_cases.json
@@ -85,6 +89,10 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
       ? "Arithmetic mismatch: Sum of itemized charges (₹1000 + ₹500 + ₹250 + ₹250 = ₹2000) and taxes (₹360) does not equal the Net Payable Total (₹1500) shown on the invoice. The diagnostic tests were double-counted."
       : null;
 
+    const repSubtotal = testCaseId === 'TC001' ? 2000 : (Number(inputData.claim_amount) || 0);
+    const repTax = testCaseId === 'TC001' ? 360 : 0;
+    const repNetPayable = testCaseId === 'TC001' ? 1500 : (Number(inputData.claim_amount) || 0);
+
     // Build extraction schema mock structure
     const mockData = {
       patientName,
@@ -101,7 +109,10 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
       findings: pres.treatment || '',
       claimType,
       invoiceMathValid: isMathValid,
-      invoiceMathDetails: mathDetails
+      invoiceMathDetails: mathDetails,
+      reportedSubtotal: repSubtotal,
+      reportedTax: repTax,
+      reportedNetPayable: repNetPayable
     };
 
     console.log(`[Mock Fallback] Successfully constructed mock OCR data for ${testCaseId} (${docType})`);

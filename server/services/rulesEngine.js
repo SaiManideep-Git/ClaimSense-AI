@@ -196,6 +196,24 @@ function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
     return result;
   }
 
+  // 7. Programmatic subtotal + tax verification
+  const repSubtotal = Number(extractedData?.reportedSubtotal || 0);
+  const repTax = Number(extractedData?.reportedTax || 0);
+  const repNetPayable = Number(extractedData?.reportedNetPayable || 0);
+  
+  if (repSubtotal > 0 && repNetPayable > 0) {
+    const calculatedTotal = repSubtotal + repTax;
+    const difference = Math.abs(calculatedTotal - repNetPayable);
+    if (difference > 10) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('FRAUD_DETECTION');
+      result.confidenceScore = 0.35;
+      result.notes = `Claim rejected due to invoice arithmetic discrepancy: The printed Subtotal (₹${repSubtotal}) and Tax (₹${repTax}) sum up to ₹${calculatedTotal}, which does not match the printed Net Payable Total (₹${repNetPayable}) on the invoice.`;
+      result.nextSteps = 'Please submit a corrected invoice bill with accurate line items, subtotal, and tax calculations from your healthcare provider.';
+      return result;
+    }
+  }
+
   // ----------------------------------------------------
   // STEP 1: Basic Eligibility Check
   // ----------------------------------------------------
