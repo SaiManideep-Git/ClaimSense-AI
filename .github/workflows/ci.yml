@@ -35,7 +35,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             
-            const tcData = JSON.parse(fs.readFileSync('../plum_intern_assignment/test_cases.json', 'utf8'));
+            const tcData = JSON.parse(fs.readFileSync('./test_cases.json', 'utf8'));
             let failures = 0;
             
             tcData.test_cases.forEach(tc => {
@@ -46,12 +46,16 @@ jobs:
                 memberId: input.member_id,
                 memberName: input.member_name,
                 treatmentDate: input.treatment_date,
+                submissionDate: input.submission_date || input.treatment_date,
                 claimAmount: input.claim_amount,
                 hospital: input.hospital || '',
                 cashlessRequest: input.cashless_request || false,
                 memberJoinDate: input.member_join_date || null,
                 previousClaimsSameDay: input.previous_claims_same_day || 0
               };
+              const treatment = input.documents?.prescription?.treatment;
+              // Some legacy cases provide a generic `treatment` field instead of medicines/procedures lists.
+              const treatmentEntries = Array.isArray(treatment) ? treatment : (treatment ? [treatment] : []);
               
               const extractedData = {
                 patientName: input.member_name,
@@ -61,9 +65,9 @@ jobs:
                 consultationDate: input.treatment_date,
                 claimAmount: input.claim_amount,
                 consultationFee: input.documents?.bill?.consultation_fee || 0,
-                medicines: input.documents?.prescription?.medicines_prescribed || [],
-                tests: input.documents?.prescription?.tests_prescribed || input.documents?.bill?.test_names || [],
-                procedures: input.documents?.prescription?.procedures || [],
+                medicines: input.documents?.prescription?.medicines_prescribed || treatmentEntries,
+                tests: input.documents?.prescription?.tests_prescribed || [],
+                procedures: input.documents?.prescription?.procedures || treatmentEntries,
                 diagnosis: input.documents?.prescription?.diagnosis || '',
                 claimType: input.documents?.prescription?.procedures ? 'Dental' : 'OPD'
               };
