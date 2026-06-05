@@ -207,8 +207,8 @@ async function generateWithRetry(model, contentArgs, maxRetries = 3, initialDela
  */
 async function extractWithGemini(file, docType) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  // Using gemini-1.5-flash as it is highly stable, fast, and supports multimodal documents (images and PDFs)
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // Using gemini-2.0-flash as it is highly stable, fast, and supports multimodal documents (images and PDFs)
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const inlineData = {
     data: file.buffer.toString('base64'),
