@@ -54,6 +54,7 @@ jobs:
                 previousClaimsSameDay: input.previous_claims_same_day || 0
               };
               const treatment = input.documents?.prescription?.treatment;
+              // Some legacy cases provide a generic `treatment` field instead of medicines/procedures lists.
               const treatmentEntries = Array.isArray(treatment) ? treatment : (treatment ? [treatment] : []);
               
               const extractedData = {
