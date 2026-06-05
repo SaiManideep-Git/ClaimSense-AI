@@ -747,7 +747,8 @@ function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
   // If Network Hospital, apply network discount (e.g. 20% on the entire claim amount)
   // If Non-network, apply copay (e.g. 10% on the entire claim amount)
   const hospitalName = (claim.hospital || extractedData?.hospitalName || '').trim();
-  const isNetworkHospital = hospitalName ? policy.network_hospitals?.some(h => 
+  const networkHospitalsList = policy.networkHospitals || policy.network_hospitals || defaultPolicy.network_hospitals || [];
+  const isNetworkHospital = hospitalName ? networkHospitalsList.some(h => 
     h.toLowerCase().includes(hospitalName.toLowerCase()) ||
     hospitalName.toLowerCase().includes(h.toLowerCase())
   ) : false;

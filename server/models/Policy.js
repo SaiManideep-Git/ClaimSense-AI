@@ -54,6 +54,10 @@ const PolicySchema = new mongoose.Schema({
     type: Number,
     default: 90
   },
+  networkHospitals: {
+    type: [String],
+    default: ["Apollo Hospitals", "Fortis Healthcare", "Max Healthcare", "Manipal Hospitals", "Narayana Health"]
+  },
   createdAt: {
     type: Date,
     default: Date.now
