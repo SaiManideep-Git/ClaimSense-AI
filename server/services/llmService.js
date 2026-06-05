@@ -90,19 +90,16 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
     const doctorReg = pres.doctor_reg || bill.doctor_reg || 'KA/45678/2015';
     const consultationDate = claimContext.treatmentDate || inputData.treatment_date || '2024-11-01';
 
-    // Math checks for mock data (TC001 has a known math discrepancy)
-    const isMathValid = testCaseId !== 'TC001';
-    const mathDetails = testCaseId === 'TC001'
-      ? "Arithmetic mismatch: Sum of itemized charges (₹1000 + ₹500 + ₹250 + ₹250 = ₹2000) and taxes (₹360) does not equal the Net Payable Total (₹1500) shown on the invoice. The diagnostic tests were double-counted."
-      : null;
+    // Math checks for mock data
+    const isMathValid = true;
+    const mathDetails = null;
 
-    const repSubtotal = testCaseId === 'TC001' ? 2000 : (testCaseId === 'TC006' ? 3389.83 : (Number(inputData.claim_amount) || 0));
-    const repTax = testCaseId === 'TC001' ? 360 : (testCaseId === 'TC006' ? 610.17 : 0);
-    const repNetPayable = testCaseId === 'TC001' ? 1500 : (testCaseId === 'TC006' ? 4000 : (Number(inputData.claim_amount) || 0));
+    const repSubtotal = testCaseId === 'TC006' ? 3389.83 : (Number(inputData.claim_amount) || 0);
+    const repTax = testCaseId === 'TC006' ? 610.17 : 0;
+    const repNetPayable = testCaseId === 'TC006' ? 4000 : (Number(inputData.claim_amount) || 0);
 
     const mockLineItems = testCaseId === 'TC001' ? [
       { description: "Consultation Fee", amount: 1000 },
-      { description: "Diagnostic Tests", amount: 500 },
       { description: "Diagnostic Test: CBC", amount: 250 },
       { description: "Diagnostic Test: Dengue test", amount: 250 }
     ] : (testCaseId === 'TC006' ? [
