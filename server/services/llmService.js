@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 
@@ -150,30 +151,49 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
  */
 async function extractDocumentData(file, docType, claimContext = {}) {
   const hasGeminiKey = !!process.env.GEMINI_API_KEY;
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 
-  if (!hasGeminiKey) {
+  if (!hasGeminiKey && !hasOpenAIKey) {
     if (claimContext.testCaseId) {
-      console.warn(`[LLM] Gemini API key missing. Falling back to mock test case data for: ${claimContext.testCaseId}`);
+      console.warn(`[LLM] Both LLM API keys missing. Falling back to mock test case data for: ${claimContext.testCaseId}`);
       const mockData = getMockTestCaseData(claimContext.testCaseId, docType, claimContext);
       if (mockData) return mockData;
     }
-    throw new Error('Gemini API credentials missing. Please configure GEMINI_API_KEY in server environment.');
+    throw new Error('LLM API credentials missing. Please configure GEMINI_API_KEY or OPENAI_API_KEY in server environment.');
   }
 
-  console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
-  try {
-    const extracted = await extractWithGemini(file, docType);
-    return extracted;
-  } catch (err) {
-    console.error(`[LLM] Gemini API extraction failed: ${err.message}`);
-    // Check if we can fall back to mock data
-    if (claimContext.testCaseId) {
-      console.log(`[LLM] Falling back to mock test case data for: ${claimContext.testCaseId}`);
-      const mockData = getMockTestCaseData(claimContext.testCaseId, docType, claimContext);
-      if (mockData) return mockData;
+  let geminiError = null;
+
+  if (hasGeminiKey) {
+    try {
+      console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
+      const extracted = await extractWithGemini(file, docType);
+      return extracted;
+    } catch (err) {
+      console.error(`[LLM] Gemini API extraction failed: ${err.message}`);
+      geminiError = err;
     }
-    throw err;
   }
+
+  if (hasOpenAIKey) {
+    try {
+      console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
+      const extracted = await extractWithOpenAI(file, docType);
+      return extracted;
+    } catch (openAiErr) {
+      console.error(`[LLM] OpenAI API extraction failed: ${openAiErr.message}`);
+      geminiError = geminiError || openAiErr;
+    }
+  }
+
+  // If both live LLMs failed, check if we can fall back to mock data
+  if (claimContext.testCaseId) {
+    console.log(`[LLM] Falling back to mock test case data for: ${claimContext.testCaseId}`);
+    const mockData = getMockTestCaseData(claimContext.testCaseId, docType, claimContext);
+    if (mockData) return mockData;
+  }
+
+  throw geminiError || new Error('Document extraction failed on all available LLM endpoints.');
 }
 
 
@@ -207,8 +227,8 @@ async function generateWithRetry(model, contentArgs, maxRetries = 3, initialDela
  */
 async function extractWithGemini(file, docType) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  // Using gemini-2.0-flash as it is highly stable, fast, and supports multimodal documents (images and PDFs)
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  // Using gemini-2.5-flash as it is highly stable, fast, and supports multimodal documents (images and PDFs)
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const inlineData = {
     data: file.buffer.toString('base64'),
@@ -236,9 +256,52 @@ async function extractWithGemini(file, docType) {
   return JSON.parse(text);
 }
 
-// OpenAI fallback disabled per user request
+/**
+ * OpenAI API extraction
+ */
+async function extractWithOpenAI(file, docType) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const base64Image = file.buffer.toString('base64');
+  
+  let messages = [
+    {
+      role: 'system',
+      content: SYSTEM_PROMPT
+    }
+  ];
 
-// Mock fallback disabled per user request
+  const safeMime = getSafeMimeType(file);
+  // OpenAI gpt-4o-mini supports image URLs/base64
+  if (safeMime.startsWith('image/')) {
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: `Document Category: ${docType}. Extract information:` },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:${safeMime};base64,${base64Image}`
+          }
+        }
+      ]
+    });
+  } else {
+    // If it's plain text (e.g. virtual files) or PDF, parse it as text content
+    messages.push({
+      role: 'user',
+      content: `Document Category: ${docType}. Document Content: ${file.buffer.toString('utf8')}`
+    });
+  }
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: messages,
+    response_format: { type: "json_object" }
+  });
+
+  const content = response.choices[0].message.content;
+  return JSON.parse(content);
+}
 
 /**
  * Safely determines the mimetype of a file by verifying magic numbers of images/PDFs.
