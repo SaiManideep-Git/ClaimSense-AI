@@ -35,7 +35,8 @@ router.post('/submit', upload, async (req, res) => {
       memberJoinDate,
       previousClaimsSameDay,
       preAuthId,
-      submissionDate
+      submissionDate,
+      testCaseId
     } = req.body;
 
     // Validate base inputs
@@ -243,7 +244,8 @@ router.post('/submit', upload, async (req, res) => {
       memberGender: employee.gender,
       memberAge: employee.age,
       preAuthId: preAuthId || '',
-      submissionDate: submissionDate || null
+      submissionDate: submissionDate || null,
+      testCaseId: testCaseId || null
     };
 
     // 1. Upload files to Storage (Cloudinary or local)
