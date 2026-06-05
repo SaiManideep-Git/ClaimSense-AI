@@ -293,11 +293,19 @@ router.post('/submit', upload, async (req, res) => {
       console.log('[Claim Submission] Successfully extracted data from prescription:', JSON.stringify(prescriptionExtracted, null, 2));
     }
     if (billFile) {
+      if (prescriptionFile) {
+        console.log('[Claim Submission] Waiting 1500ms before processing bill to avoid rate limits...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
       billExtracted = await extractDocumentData(billFile, 'bill', claimContext);
       uploadedDocs.bill.extractedText = JSON.stringify(billExtracted);
       console.log('[Claim Submission] Successfully extracted data from bill:', JSON.stringify(billExtracted, null, 2));
     }
     if (reportFiles.length > 0) {
+      if (prescriptionFile || billFile) {
+        console.log('[Claim Submission] Waiting 1500ms before processing report to avoid rate limits...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
       try {
         reportExtracted = await extractDocumentData(reportFiles[0], 'report', claimContext);
         if (uploadedDocs.reports && uploadedDocs.reports[0]) {
