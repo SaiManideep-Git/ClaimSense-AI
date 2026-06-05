@@ -46,7 +46,7 @@ jobs:
                 memberId: input.member_id,
                 memberName: input.member_name,
                 treatmentDate: input.treatment_date,
-                submissionDate: input.treatment_date,
+                submissionDate: input.submission_date || input.treatment_date,
                 claimAmount: input.claim_amount,
                 hospital: input.hospital || '',
                 cashlessRequest: input.cashless_request || false,
@@ -54,6 +54,7 @@ jobs:
                 previousClaimsSameDay: input.previous_claims_same_day || 0
               };
               const treatment = input.documents?.prescription?.treatment;
+              const treatmentEntries = Array.isArray(treatment) ? treatment : (treatment ? [treatment] : []);
               
               const extractedData = {
                 patientName: input.member_name,
@@ -63,9 +64,9 @@ jobs:
                 consultationDate: input.treatment_date,
                 claimAmount: input.claim_amount,
                 consultationFee: input.documents?.bill?.consultation_fee || 0,
-                medicines: input.documents?.prescription?.medicines_prescribed || (treatment ? [treatment] : []),
+                medicines: input.documents?.prescription?.medicines_prescribed || treatmentEntries,
                 tests: input.documents?.prescription?.tests_prescribed || [],
-                procedures: input.documents?.prescription?.procedures || (treatment ? [treatment] : []),
+                procedures: input.documents?.prescription?.procedures || treatmentEntries,
                 diagnosis: input.documents?.prescription?.diagnosis || '',
                 claimType: input.documents?.prescription?.procedures ? 'Dental' : 'OPD'
               };
