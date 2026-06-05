@@ -291,7 +291,7 @@ async function extractWithGroq(file, docType) {
     });
   }
 
-  const model = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
+  const model = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
 
   const response = await groq.chat.completions.create({
     model: model,
