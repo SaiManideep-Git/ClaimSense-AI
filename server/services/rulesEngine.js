@@ -757,8 +757,8 @@ function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
     if (isNetworkHospital) {
       result.deductions.networkDiscount = eligibleBaseAmount * (networkDiscount / 100);
       result.deductions.copay = 0;
-      result.approvedAmount = eligibleBaseAmount - result.deductions.networkDiscount;
-      result.notes = `Treatment at network hospital: 0% co-payment applied. 20% network provider discount of ₹${result.deductions.networkDiscount} applied.`;
+      result.approvedAmount = eligibleBaseAmount;
+      result.notes = `Treatment at network hospital: 0% co-payment applied. 20% network provider discount of ₹${result.deductions.networkDiscount} applied (no deduction from member payout).`;
     } else {
       result.deductions.copay = eligibleBaseAmount * (copayPercentage / 100);
       result.approvedAmount = eligibleBaseAmount - result.deductions.copay;

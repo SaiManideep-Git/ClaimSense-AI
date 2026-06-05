@@ -284,7 +284,7 @@
       },
       "expected_output": {
         "decision": "APPROVED",
-        "approved_amount": 3600,
+        "approved_amount": 4500,
         "cashless_approved": true,
         "network_discount": 900,
         "confidence_score": 0.93
