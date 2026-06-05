@@ -1033,7 +1033,7 @@ export default function App() {
                         </div>
 
                         <div>
-                          <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Claim Amount (Γé╣)</label>
+                          <label className="text-xs text-slate-400 block mb-1.5 font-semibold">Claim Amount (₹)</label>
                           <div className="relative">
                             <CreditCard className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                             <input
@@ -1083,7 +1083,7 @@ export default function App() {
                               <div className="flex justify-between text-xs font-semibold">
                                 <span className="text-slate-400">Annual Policy Spend</span>
                                 <span className={ytdApprovedAmount >= (policyDetails.annualLimit || 50000) ? "text-red-400" : "text-slate-200"}>
-                                  Γé╣{ytdApprovedAmount.toLocaleString('en-IN')} / Γé╣{(policyDetails.annualLimit || 50000).toLocaleString('en-IN')}
+                                  ₹{ytdApprovedAmount.toLocaleString('en-IN')} / ₹{(policyDetails.annualLimit || 50000).toLocaleString('en-IN')}
                                 </span>
                               </div>
                               
@@ -1101,7 +1101,7 @@ export default function App() {
                               </div>
                               
                               <div className="flex justify-between text-[10px] text-slate-500">
-                                <span>Remaining: Γé╣{Math.max(0, (policyDetails.annualLimit || 50000) - ytdApprovedAmount).toLocaleString('en-IN')}</span>
+                                <span>Remaining: ₹{Math.max(0, (policyDetails.annualLimit || 50000) - ytdApprovedAmount).toLocaleString('en-IN')}</span>
                                 {ytdApprovedAmount >= (policyDetails.annualLimit || 50000) && (
                                   <span className="text-red-400 font-semibold">Limit Exhausted!</span>
                                 )}
@@ -1132,17 +1132,6 @@ export default function App() {
                             className="rounded bg-slate-900 border-slate-800 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
                           />
                           Pre-Authorization Cashless Request
-                        </label>
-
-                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
-                          <span className="text-slate-400">Previous Claims (Same Day):</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={previousClaimsSameDay}
-                            onChange={e => setPreviousClaimsSameDay(e.target.value)}
-                            className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-center text-xs focus:outline-none focus:border-brand-500"
-                          />
                         </label>
                       </div>
 
@@ -1259,7 +1248,7 @@ export default function App() {
                           <div className="space-y-1.5 text-xs text-slate-300">
                             <div className="flex justify-between">
                               <span className="text-slate-500">Payable Amount:</span>
-                              <span className="font-semibold text-emerald-400 font-mono">Γé╣{createdClaim.adjudication.approvedAmount}</span>
+                              <span className="font-semibold text-emerald-400 font-mono">₹{createdClaim.adjudication.approvedAmount}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-500">Adjudication Notes:</span>
@@ -1369,7 +1358,7 @@ export default function App() {
                             </td>
                             <td className="px-6 py-4 text-slate-300 font-medium truncate max-w-[150px]">{claim.hospital || 'Not Specified'}</td>
                             <td className="px-6 py-4 text-slate-400 font-medium">{new Date(claim.treatmentDate).toLocaleDateString()}</td>
-                            <td className="px-6 py-4 text-right font-mono font-bold text-slate-200">Γé╣{claim.claimAmount}</td>
+                            <td className="px-6 py-4 text-right font-mono font-bold text-slate-200">₹{claim.claimAmount}</td>
                             <td className="px-6 py-4">{getStatusBadge(claim.adjudication.decision)}</td>
                             <td className="px-6 py-4 text-center">
                               <button
