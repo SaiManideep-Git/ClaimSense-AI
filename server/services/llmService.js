@@ -1,5 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const OpenAI = require('openai');
+const Groq = require('groq-sdk');
 const fs = require('fs');
 const path = require('path');
 
@@ -142,58 +142,58 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
 }
 
 /**
- * Extracts structured data from medical documents using live Gemini API.
- * Falls back to mock test case data if Gemini fails or quota is exhausted.
+ * Extracts structured data from medical documents using live Groq API.
+ * Falls back to Gemini and then to mock test case data if live API fails.
  * @param {Object} file - File object from Multer (buffer, mimetype, originalname)
  * @param {string} docType - "prescription" or "bill" or "report"
  * @param {Object} claimContext - Additional claim metadata
  * @returns {Promise<Object>} Extracted structured data
  */
 async function extractDocumentData(file, docType, claimContext = {}) {
+  const hasGroqKey = !!process.env.GROQ_API_KEY;
   const hasGeminiKey = !!process.env.GEMINI_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
 
-  if (!hasGeminiKey && !hasOpenAIKey) {
+  if (!hasGroqKey && !hasGeminiKey) {
     if (claimContext.testCaseId) {
-      console.warn(`[LLM] Both LLM API keys missing. Falling back to mock test case data for: ${claimContext.testCaseId}`);
+      console.warn(`[LLM] Both LLM API keys (Groq, Gemini) missing. Falling back to mock test case data for: ${claimContext.testCaseId}`);
       const mockData = getMockTestCaseData(claimContext.testCaseId, docType, claimContext);
       if (mockData) return mockData;
     }
-    throw new Error('LLM API credentials missing. Please configure GEMINI_API_KEY or OPENAI_API_KEY in server environment.');
+    throw new Error('LLM API credentials missing. Please configure GROQ_API_KEY or GEMINI_API_KEY in server environment.');
   }
 
-  let geminiError = null;
+  let lastError = null;
+
+  if (hasGroqKey) {
+    try {
+      console.log(`[LLM] Processing with Groq API: ${file.originalname}`);
+      const extracted = await extractWithGroq(file, docType);
+      return extracted;
+    } catch (err) {
+      console.error(`[LLM] Groq API extraction failed: ${err.message}`);
+      lastError = err;
+    }
+  }
 
   if (hasGeminiKey) {
     try {
-      console.log(`[LLM] Processing with Gemini API: ${file.originalname}`);
+      console.log(`[LLM] Falling back to Gemini API: ${file.originalname}`);
       const extracted = await extractWithGemini(file, docType);
       return extracted;
-    } catch (err) {
-      console.error(`[LLM] Gemini API extraction failed: ${err.message}`);
-      geminiError = err;
+    } catch (geminiErr) {
+      console.error(`[LLM] Gemini API extraction failed: ${geminiErr.message}`);
+      lastError = lastError || geminiErr;
     }
   }
 
-  if (hasOpenAIKey) {
-    try {
-      console.log(`[LLM] Falling back to OpenAI API: ${file.originalname}`);
-      const extracted = await extractWithOpenAI(file, docType);
-      return extracted;
-    } catch (openAiErr) {
-      console.error(`[LLM] OpenAI API extraction failed: ${openAiErr.message}`);
-      geminiError = geminiError || openAiErr;
-    }
-  }
-
-  // If both live LLMs failed, check if we can fall back to mock data
+  // If live LLMs failed, check if we can fall back to mock data
   if (claimContext.testCaseId) {
     console.log(`[LLM] Falling back to mock test case data for: ${claimContext.testCaseId}`);
     const mockData = getMockTestCaseData(claimContext.testCaseId, docType, claimContext);
     if (mockData) return mockData;
   }
 
-  throw geminiError || new Error('Document extraction failed on all available LLM endpoints.');
+  throw lastError || new Error('Document extraction failed on all available LLM endpoints.');
 }
 
 
@@ -257,10 +257,10 @@ async function extractWithGemini(file, docType) {
 }
 
 /**
- * OpenAI API extraction
+ * Groq API extraction
  */
-async function extractWithOpenAI(file, docType) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+async function extractWithGroq(file, docType) {
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const base64Image = file.buffer.toString('base64');
   
   let messages = [
@@ -271,7 +271,6 @@ async function extractWithOpenAI(file, docType) {
   ];
 
   const safeMime = getSafeMimeType(file);
-  // OpenAI gpt-4o-mini supports image URLs/base64
   if (safeMime.startsWith('image/')) {
     messages.push({
       role: 'user',
@@ -286,15 +285,16 @@ async function extractWithOpenAI(file, docType) {
       ]
     });
   } else {
-    // If it's plain text (e.g. virtual files) or PDF, parse it as text content
     messages.push({
       role: 'user',
       content: `Document Category: ${docType}. Document Content: ${file.buffer.toString('utf8')}`
     });
   }
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const model = process.env.GROQ_MODEL || 'llama-3.2-11b-vision-preview';
+
+  const response = await groq.chat.completions.create({
+    model: model,
     messages: messages,
     response_format: { type: "json_object" }
   });
