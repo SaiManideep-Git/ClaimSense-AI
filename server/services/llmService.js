@@ -56,6 +56,31 @@ async function extractDocumentData(file, docType, claimContext = {}) {
 
 
 /**
+ * Helper to call Gemini generateContent with exponential backoff on temporary server errors (e.g. 503 Service Unavailable).
+ */
+async function generateWithRetry(model, contentArgs, maxRetries = 3, initialDelay = 1500) {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      const result = await model.generateContent(contentArgs);
+      return result;
+    } catch (error) {
+      attempt++;
+      const errMsg = error.message || '';
+      const isRetryable = errMsg.includes('503') || errMsg.includes('429') || errMsg.includes('Service Unavailable') || errMsg.includes('Resource Exhausted') || errMsg.includes('demand');
+      if (isRetryable && attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        console.warn(`[Gemini API] Temporary error (attempt ${attempt}/${maxRetries}): ${errMsg}. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+
+/**
  * Gemini API extraction
  */
 async function extractWithGemini(file, docType) {
@@ -70,7 +95,7 @@ async function extractWithGemini(file, docType) {
 
   const prompt = `${SYSTEM_PROMPT}\n\nDocument Category: ${docType}\nExtract information from this medical document:`;
 
-  const result = await model.generateContent({
+  const result = await generateWithRetry(model, {
     contents: [
       {
         role: 'user',
