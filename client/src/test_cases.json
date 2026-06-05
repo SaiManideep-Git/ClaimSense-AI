@@ -7,7 +7,7 @@
       "input_data": {
         "member_id": "EMP001",
         "member_name": "Rajesh Kumar",
-        "treatment_date": "2026-05-01",
+        "treatment_date": "2026-05-10",
         "claim_amount": 1500,
         "documents": {
           "prescription": {
@@ -39,7 +39,7 @@
       "input_data": {
         "member_id": "EMP002",
         "member_name": "Priya Singh",
-        "treatment_date": "2026-05-05",
+        "treatment_date": "2026-05-12",
         "claim_amount": 12000,
         "documents": {
           "prescription": {

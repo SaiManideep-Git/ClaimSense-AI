@@ -39,9 +39,13 @@ const drawDocument = (type, tcId, tc) => {
     ctx.font = 'bold 24px Arial';
     ctx.fillText(input.hospital || 'Care Clinic & Diagnostics', 50, 70);
 
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 13px Arial';
+    ctx.fillText(`DOCTOR REG NO: ${pres.doctor_reg || 'KA/45678/2015'}`, 50, 95);
+
     ctx.fillStyle = '#475569';
     ctx.font = '12px Arial';
-    ctx.fillText(`Reg No: ${pres.doctor_reg || 'KA/45678/2015'} | PH: +91 9876543210`, 50, 95);
+    ctx.fillText(`PH: +91 9876543210`, 420, 95);
 
     ctx.strokeStyle = '#cbd5e1';
     ctx.lineWidth = 1;
