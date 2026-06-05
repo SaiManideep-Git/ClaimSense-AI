@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, Sparkles, User, Calendar, CreditCard, Network, AlertCircle, Lock, Users, UserPlus, Power, PowerOff } from 'lucide-react';
+import { FileUp, ClipboardList, ShieldAlert, Cpu, HelpCircle, Sparkles, User, Calendar, CreditCard, Network, AlertCircle, Lock, Users, UserPlus, Power, PowerOff, X, Eye } from 'lucide-react';
 import { PolicyViewer } from './components/PolicyViewer';
 
 import { ClaimDetailsModal } from './components/ClaimDetailsModal';
@@ -66,6 +66,22 @@ export default function App() {
   const [billFile, setBillFile] = useState<File | null>(null);
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [testCaseId, setTestCaseId] = useState('');
+
+  // File Preview States
+  const [previewFile, setPreviewFile] = useState<{ file: File; title: string } | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (previewFile) {
+      const url = URL.createObjectURL(previewFile.file);
+      setPreviewUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    } else {
+      setPreviewUrl('');
+    }
+  }, [previewFile]);
 
   // Role & Authentication States
   const [userRole, setUserRole] = useState<'user' | 'admin'>('user');
@@ -853,12 +869,35 @@ export default function App() {
                             <input
                               type="file"
                               accept="image/*,application/pdf"
-                              onChange={e => setPrescriptionFile(e.target.files?.[0] || null)}
+                              onChange={e => {
+                                setPrescriptionFile(e.target.files?.[0] || null);
+                                setTestCaseId('');
+                              }}
                               className="hidden"
                             />
                           </label>
                           {prescriptionFile && (
-                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {prescriptionFile.name}</span>
+                            <div className="mt-3 flex items-center justify-between gap-2 bg-slate-900/80 backdrop-blur border border-emerald-500/30 rounded-lg p-2 text-left animate-scale-in">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewFile({ file: prescriptionFile, title: 'Prescription' })}
+                                className="flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold truncate flex-1 text-left"
+                              >
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">{prescriptionFile.name}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPrescriptionFile(null);
+                                  setTestCaseId('');
+                                }}
+                                className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-red-400 transition shrink-0"
+                                title="Remove file"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -873,12 +912,35 @@ export default function App() {
                             <input
                               type="file"
                               accept="image/*,application/pdf"
-                              onChange={e => setBillFile(e.target.files?.[0] || null)}
+                              onChange={e => {
+                                setBillFile(e.target.files?.[0] || null);
+                                setTestCaseId('');
+                              }}
                               className="hidden"
                             />
                           </label>
                           {billFile && (
-                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {billFile.name}</span>
+                            <div className="mt-3 flex items-center justify-between gap-2 bg-slate-900/80 backdrop-blur border border-emerald-500/30 rounded-lg p-2 text-left animate-scale-in">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewFile({ file: billFile, title: 'Invoice Bill' })}
+                                className="flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold truncate flex-1 text-left"
+                              >
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">{billFile.name}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBillFile(null);
+                                  setTestCaseId('');
+                                }}
+                                className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-red-400 transition shrink-0"
+                                title="Remove file"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -893,12 +955,35 @@ export default function App() {
                             <input
                               type="file"
                               accept="image/*,application/pdf"
-                              onChange={e => setReportFile(e.target.files?.[0] || null)}
+                              onChange={e => {
+                                setReportFile(e.target.files?.[0] || null);
+                                setTestCaseId('');
+                              }}
                               className="hidden"
                             />
                           </label>
                           {reportFile && (
-                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {reportFile.name}</span>
+                            <div className="mt-3 flex items-center justify-between gap-2 bg-slate-900/80 backdrop-blur border border-emerald-500/30 rounded-lg p-2 text-left animate-scale-in">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewFile({ file: reportFile, title: 'Diagnostic Report' })}
+                                className="flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold truncate flex-1 text-left"
+                              >
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">{reportFile.name}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReportFile(null);
+                                  setTestCaseId('');
+                                }}
+                                className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-red-400 transition shrink-0"
+                                title="Remove file"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -1311,6 +1396,63 @@ export default function App() {
             setClaims(prev => prev.map(c => c._id === updatedClaim._id ? updatedClaim as any : c));
           }}
         />
+      )}
+
+      {/* Document Preview Modal */}
+      {previewFile && previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-brand-400" />
+                <h3 className="text-sm font-bold text-slate-200">{previewFile.title} Document Preview</h3>
+              </div>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-slate-200 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-slate-950/20 min-h-[300px]">
+              {previewFile.file.type.startsWith('image/') ? (
+                <img
+                  src={previewUrl}
+                  alt={previewFile.title}
+                  className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg border border-slate-800"
+                />
+              ) : previewFile.file.type === 'application/pdf' ? (
+                <iframe
+                  src={previewUrl}
+                  title={previewFile.title}
+                  className="w-full h-[60vh] rounded-lg border border-slate-800 bg-white"
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <AlertCircle className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                  <p className="text-sm font-semibold text-slate-300">{previewFile.file.name}</p>
+                  <p className="text-xs text-slate-500 mt-1">Preview not supported for this file type.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-800 bg-slate-950/50 flex justify-between items-center text-xs text-slate-500">
+              <span>Size: {(previewFile.file.size / 1024).toFixed(1)} KB</span>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="bg-slate-850 hover:bg-slate-800 text-slate-300 font-semibold px-4 py-2 rounded-xl transition"
+              >
+                Close Preview
+              </button>
+            </div>
+            
+          </div>
+        </div>
       )}
 
       {/* Bottom Footer */}
