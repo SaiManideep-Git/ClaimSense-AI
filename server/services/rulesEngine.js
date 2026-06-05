@@ -31,6 +31,64 @@ try {
 }
 
 /**
+ * Checks if a child line item is conceptually related to a parent category item.
+ */
+function areItemsRelated(parentDesc, childDesc) {
+  const p = (parentDesc || "").toLowerCase();
+  const c = (childDesc || "").toLowerCase();
+  
+  // Exclude checking relations for single-service items
+  const singleServices = ['consultation', 'visit', 'doctor', 'room', 'bed', 'rent', 'admission', 'discharge'];
+  for (const service of singleServices) {
+    if (p.includes(service)) return false;
+  }
+
+  // If they share a significant word (length > 3)
+  const pWords = p.split(/\s+/).filter(w => w.length > 3 && w !== 'with' && w !== 'fees' && w !== 'cost' && w !== 'rate' && w !== 'total');
+  for (const pw of pWords) {
+    const root = pw.replace(/s$/, ''); // simple plural strip
+    if (root.length > 3 && c.includes(root)) return true;
+  }
+  
+  // Specific category mappings:
+  // If parent is test/lab/scan and child has test keywords
+  const isParentTest = p.includes('test') || p.includes('lab') || p.includes('investigation') || p.includes('scan') || p.includes('x-ray') || p.includes('mri') || p.includes('cbc') || p.includes('panel');
+  const isChildTest = c.includes('test') || c.includes('cbc') || c.includes('dengue') || c.includes('blood') || c.includes('profile') || c.includes('sugar') || c.includes('scan') || c.includes('xray');
+  if (isParentTest && isChildTest) return true;
+  
+  // If parent is medicine/pharmacy/drug and child has medicine keywords
+  const isParentMed = p.includes('medicine') || p.includes('pharmacy') || p.includes('drug') || p.includes('pharma');
+  const isChildMed = c.includes('tab') || c.includes('syp') || c.includes('capsule') || c.includes('tablet') || c.includes('syrup') || c.includes('ointment');
+  if (isParentMed && isChildMed) return true;
+  
+  return false;
+}
+
+/**
+ * Finds if a subset of items sums up exactly to the target value.
+ */
+function findSubsetSum(items, target) {
+  const n = items.length;
+  const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  if (total < target - 0.1) return null;
+  if (Math.abs(total - target) < 0.1) return items;
+  
+  function backtrack(start, currentSum, path) {
+    if (Math.abs(currentSum - target) < 0.1) return path;
+    if (currentSum > target + 0.1 || start >= n) return null;
+    
+    // Include
+    const withItem = backtrack(start + 1, currentSum + Number(items[start].amount || 0), [...path, items[start]]);
+    if (withItem) return withItem;
+    
+    // Exclude
+    return backtrack(start + 1, currentSum, path);
+  }
+  
+  return backtrack(0, 0, []);
+}
+
+/**
  * Validates individual itemized charges and checks for arithmetic consistency and double-counting.
  * @param {Array} lineItems - Array of line items with description and amount
  * @param {number} reportedSubtotal - Subtotal printed on the invoice
@@ -52,16 +110,21 @@ function verifyInvoiceLineItems(lineItems, reportedSubtotal) {
     const parentAmount = Number(lineItems[i].amount || 0);
     if (parentAmount <= 0) continue;
 
-    // Find other items
-    const otherItems = lineItems.filter((_, idx) => idx !== i);
-    
-    // Check if any group of smaller items sums up exactly to parentAmount
-    const smallerItems = otherItems.filter(item => Number(item.amount || 0) < parentAmount);
-    const sumSmaller = smallerItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const parentDesc = lineItems[i].description || "";
 
-    if (sumSmaller === parentAmount && smallerItems.length > 0) {
+    // Find other related items that are smaller in value
+    const relatedSmallerItems = lineItems.filter((item, idx) => {
+      if (idx === i) return false;
+      const amt = Number(item.amount || 0);
+      if (amt >= parentAmount) return false;
+      return areItemsRelated(parentDesc, item.description || "");
+    });
+
+    const matchingSubset = findSubsetSum(relatedSmallerItems, parentAmount);
+
+    if (matchingSubset && matchingSubset.length > 0) {
       doubleCountingDetected = true;
-      doubleCountingDetails = `Double-counting detected: The category total '${lineItems[i].description}' (₹${parentAmount}) is equal to the sum of sub-items (${smallerItems.map(item => `'${item.description}' (₹${item.amount})`).join(' + ')}). Both the category header and individual items were added to the bill subtotal, inflating it.`;
+      doubleCountingDetails = `Double-counting detected: The category total '${parentDesc}' (₹${parentAmount}) is equal to the sum of sub-items (${matchingSubset.map(item => `'${item.description}' (₹${item.amount})`).join(' + ')}). Both the category header and individual items were added to the bill subtotal, inflating it.`;
       break;
     }
   }
