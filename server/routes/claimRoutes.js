@@ -489,5 +489,127 @@ router.get('/employee/:memberId', async (req, res) => {
   }
 });
 
+/**
+ * @route   GET /api/claims/employees/all
+ * @desc    Fetch all employees in the directory
+ */
+router.get('/employees/all', async (req, res) => {
+  try {
+    const employees = await Employee.find().sort({ memberId: 1 });
+    res.json({ success: true, employees });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch employee directory', details: err.message });
+  }
+});
+
+/**
+ * @route   POST /api/claims/employees/create
+ * @desc    Register a new employee
+ */
+router.post('/employees/create', async (req, res) => {
+  try {
+    const { memberId, name, joinDate, age, gender } = req.body;
+    if (!memberId || !name || !joinDate) {
+      return res.status(400).json({ error: 'Missing required employee fields: memberId, name, joinDate' });
+    }
+
+    const existing = await Employee.findOne({ memberId });
+    if (existing) {
+      return res.status(400).json({ error: `Employee with ID ${memberId} already exists in registry.` });
+    }
+
+    const newEmployee = new Employee({
+      memberId,
+      name,
+      joinDate: new Date(joinDate),
+      policyId: "PLUM_OPD_2024",
+      status: "Active",
+      age: Number(age) || undefined,
+      gender: gender || undefined
+    });
+
+    await newEmployee.save();
+    res.status(201).json({ success: true, employee: newEmployee });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to register employee', details: err.message });
+  }
+});
+
+/**
+ * @route   PUT /api/claims/employees/:memberId/status
+ * @desc    Toggle employee status between Active and Terminated
+ */
+router.put('/employees/:memberId/status', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['Active', 'Terminated'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be Active or Terminated.' });
+    }
+
+    const employee = await Employee.findOne({ memberId });
+    if (!employee) {
+      return res.status(404).json({ error: `Employee ${memberId} not found.` });
+    }
+
+    employee.status = status;
+    await employee.save();
+
+    res.json({ success: true, employee });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update employee status', details: err.message });
+  }
+});
+
+/**
+ * @route   PUT /api/claims/:id/adjudicate
+ * @desc    Allow manual admin override of claim adjudication outcome
+ */
+router.put('/:id/adjudicate', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { decision, approvedAmount, notes } = req.body;
+
+    if (!decision || !['APPROVED', 'REJECTED', 'PARTIAL', 'MANUAL_REVIEW'].includes(decision)) {
+      return res.status(400).json({ error: 'Invalid decision. Must be APPROVED, REJECTED, PARTIAL, or MANUAL_REVIEW.' });
+    }
+
+    const claim = await Claim.findById(id);
+    if (!claim) {
+      return res.status(404).json({ error: 'Claim not found.' });
+    }
+
+    claim.status = decision.toLowerCase() === 'partial' ? 'partial' : decision.toLowerCase();
+    claim.adjudication.decision = decision;
+    claim.adjudication.approvedAmount = Number(approvedAmount) || 0;
+    claim.adjudication.notes = `[AUDITOR OVERRIDE]: ${notes || 'Claim manually reviewed and updated by admin.'} (Original: ${claim.adjudication.notes || ''})`;
+    claim.adjudication.confidenceScore = 1.0;
+
+    // Sync snake_case fields as well
+    claim.adjudication.claim_id = claim.claimId;
+    claim.adjudication.approved_amount = claim.adjudication.approvedAmount;
+    claim.adjudication.rejection_reasons = claim.adjudication.rejectionReasons;
+    claim.adjudication.confidence_score = 1.0;
+    claim.adjudication.next_steps = decision === 'APPROVED' || decision === 'PARTIAL'
+      ? `Manual override: Reimbursement of ₹${claim.adjudication.approvedAmount} authorized by auditor.`
+      : 'Manual override: Claim rejected upon auditor audit.';
+    claim.adjudication.nextSteps = claim.adjudication.next_steps;
+
+    if (claim.appealHistory && claim.appealHistory.length > 0) {
+      const lastAppeal = claim.appealHistory[claim.appealHistory.length - 1];
+      if (lastAppeal.status === 'pending') {
+        lastAppeal.status = decision.toLowerCase() === 'rejected' ? 'rejected' : 'approved';
+        lastAppeal.reviewerNotes = notes || 'Manually adjudicated by administrator.';
+      }
+    }
+
+    await claim.save();
+    res.json({ success: true, claim });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to adjudicate claim manually', details: err.message });
+  }
+});
+
 module.exports = router;
 

@@ -60,12 +60,51 @@ interface Props {
   claim: ClaimDetails;
   onClose: () => void;
   onUpdate: (updatedClaim: ClaimDetails) => void;
+  isAdmin?: boolean;
 }
 
-export const ClaimDetailsModal: React.FC<Props> = ({ claim, onClose, onUpdate }) => {
+export const ClaimDetailsModal: React.FC<Props> = ({ claim, onClose, onUpdate, isAdmin }) => {
   const [appealReason, setAppealReason] = useState('');
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
   const [showAppealForm, setShowAppealForm] = useState(false);
+
+  // Admin Override States
+  const [overrideDecision, setOverrideDecision] = useState<'APPROVED' | 'REJECTED' | 'PARTIAL' | 'MANUAL_REVIEW'>(claim.adjudication.decision);
+  const [overrideAmount, setOverrideAmount] = useState(String(claim.adjudication.approvedAmount || ''));
+  const [overrideNotes, setOverrideNotes] = useState('');
+  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
+
+  const handleOverrideSubmit = async () => {
+    setIsSubmittingOverride(true);
+    try {
+      const response = await fetch(`${API_URL}/api/claims/${claim._id}/adjudicate`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          decision: overrideDecision,
+          approvedAmount: overrideDecision === 'REJECTED' || overrideDecision === 'MANUAL_REVIEW' ? 0 : Number(overrideAmount) || 0,
+          notes: overrideNotes
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update adjudication');
+      }
+      const data = await response.json();
+      if (data.success) {
+        onUpdate(data.claim);
+        alert('Adjudication override applied successfully!');
+      } else {
+        throw new Error(data.error || 'Failed to update adjudication');
+      }
+    } catch (err: any) {
+      console.error('Failed to override adjudication:', err);
+      alert('Error overriding adjudication: ' + err.message);
+    } finally {
+      setIsSubmittingOverride(false);
+    }
+  };
 
   const handleAppealSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,9 +413,9 @@ export const ClaimDetailsModal: React.FC<Props> = ({ claim, onClose, onUpdate })
 
           {/* Appeals and Manual Review Section */}
           <div className="bg-slate-950/40 rounded-xl p-4 border border-slate-850 space-y-4">
-            <h3 className="text-xs uppercase tracking-wider text-slate-400 font-bold border-b border-slate-800 pb-2">Manual Appeal Workflow</h3>
+            <h3 className="text-xs uppercase tracking-wider text-slate-400 font-bold border-b border-slate-800 pb-2">Manual Appeal Workflow & Auditor Review</h3>
             
-            {claim.appealHistory && claim.appealHistory.length > 0 ? (
+            {claim.appealHistory && claim.appealHistory.length > 0 && (
               <div className="space-y-3">
                 <span className="text-slate-400 text-xs font-semibold block">Appeal Log:</span>
                 {claim.appealHistory.map((appeal, index) => (
@@ -393,6 +432,60 @@ export const ClaimDetailsModal: React.FC<Props> = ({ claim, onClose, onUpdate })
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {isAdmin ? (
+              <div className="bg-slate-900 border border-brand-500/20 p-4 rounded-xl space-y-4 mt-2">
+                <span className="text-xs font-bold text-brand-400 uppercase tracking-wider block">
+                  Adjudication Override Controls
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1.5 font-semibold">Adjudication Decision</label>
+                    <select
+                      value={overrideDecision}
+                      onChange={e => setOverrideDecision(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer"
+                    >
+                      <option value="APPROVED">APPROVED</option>
+                      <option value="REJECTED">REJECTED</option>
+                      <option value="PARTIAL">PARTIAL</option>
+                      <option value="MANUAL_REVIEW">MANUAL_REVIEW</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1.5 font-semibold">Approved Amount (₹)</label>
+                    <input
+                      type="number"
+                      value={overrideAmount}
+                      onChange={e => setOverrideAmount(e.target.value)}
+                      disabled={overrideDecision === 'REJECTED' || overrideDecision === 'MANUAL_REVIEW'}
+                      placeholder="Amount to approve"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500 disabled:bg-slate-900 disabled:text-slate-500 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1.5 font-semibold">Auditor Review Notes</label>
+                  <textarea
+                    value={overrideNotes}
+                    onChange={e => setOverrideNotes(e.target.value)}
+                    placeholder="Enter reason for manual override/appeal resolution..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    rows={2}
+                  />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleOverrideSubmit}
+                    disabled={isSubmittingOverride}
+                    className="bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 text-white font-semibold px-4 py-2 rounded-lg text-xs transition cursor-pointer"
+                  >
+                    {isSubmittingOverride ? 'Saving...' : 'Apply Decision Override'}
+                  </button>
+                </div>
               </div>
             ) : claim.adjudication.decision !== 'APPROVED' ? (
               <div>
