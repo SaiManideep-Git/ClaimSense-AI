@@ -31,6 +31,60 @@ try {
 }
 
 /**
+ * Validates individual itemized charges and checks for arithmetic consistency and double-counting.
+ * @param {Array} lineItems - Array of line items with description and amount
+ * @param {number} reportedSubtotal - Subtotal printed on the invoice
+ * @returns {Object} Validation result { valid: boolean, reason: string }
+ */
+function verifyInvoiceLineItems(lineItems, reportedSubtotal) {
+  if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+    return { valid: true };
+  }
+
+  // Calculate the sum of all item amounts
+  const totalSum = lineItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  // Check 1: Detect double-counting (where a category total equals the sum of sub-items, but both are added to subtotal)
+  let doubleCountingDetected = false;
+  let doubleCountingDetails = "";
+
+  for (let i = 0; i < lineItems.length; i++) {
+    const parentAmount = Number(lineItems[i].amount || 0);
+    if (parentAmount <= 0) continue;
+
+    // Find other items
+    const otherItems = lineItems.filter((_, idx) => idx !== i);
+    
+    // Check if any group of smaller items sums up exactly to parentAmount
+    const smallerItems = otherItems.filter(item => Number(item.amount || 0) < parentAmount);
+    const sumSmaller = smallerItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    if (sumSmaller === parentAmount && smallerItems.length > 0) {
+      doubleCountingDetected = true;
+      doubleCountingDetails = `Double-counting detected: The category total '${lineItems[i].description}' (₹${parentAmount}) is equal to the sum of sub-items (${smallerItems.map(item => `'${item.description}' (₹${item.amount})`).join(' + ')}). Both the category header and individual items were added to the bill subtotal, inflating it.`;
+      break;
+    }
+  }
+
+  if (doubleCountingDetected) {
+    return {
+      valid: false,
+      reason: doubleCountingDetails
+    };
+  }
+
+  // Check 2: If the sum of all line items is mathematically inconsistent with the printed subtotal
+  if (reportedSubtotal > 0 && Math.abs(totalSum - reportedSubtotal) > 10) {
+    return {
+      valid: false,
+      reason: `Arithmetic mismatch: The sum of all line items (₹${totalSum}) does not match the printed Subtotal (₹${reportedSubtotal}).`
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Adjudicates a claim based on policy rules and extracted data.
  * @param {Object} claim - Input claim data (member details, treatment date, bills)
  * @param {Object} extractedData - AI-extracted structure from documents
@@ -209,6 +263,19 @@ function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
       result.rejectionReasons.push('FRAUD_DETECTION');
       result.confidenceScore = 0.35;
       result.notes = `Claim rejected due to invoice arithmetic discrepancy: The printed Subtotal (₹${repSubtotal}) and Tax (₹${repTax}) sum up to ₹${calculatedTotal}, which does not match the printed Net Payable Total (₹${repNetPayable}) on the invoice.`;
+      result.nextSteps = 'Please submit a corrected invoice bill with accurate line items, subtotal, and tax calculations from your healthcare provider.';
+      return result;
+    }
+  }
+
+  // 8. Programmatic line items sum & double-counting verification
+  if (extractedData && extractedData.lineItems) {
+    const lineItemVerification = verifyInvoiceLineItems(extractedData.lineItems, repSubtotal);
+    if (!lineItemVerification.valid) {
+      result.decision = 'REJECTED';
+      result.rejectionReasons.push('FRAUD_DETECTION');
+      result.confidenceScore = 0.35;
+      result.notes = `Claim rejected due to invoice arithmetic discrepancy: ${lineItemVerification.reason}`;
       result.nextSteps = 'Please submit a corrected invoice bill with accurate line items, subtotal, and tax calculations from your healthcare provider.';
       return result;
     }

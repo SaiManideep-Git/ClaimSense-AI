@@ -21,7 +21,13 @@ const extractionSchema = {
   invoiceMathDetails: "String: If invoiceMathValid is false, write a detailed explanation of the arithmetic discrepancy or double-counting (e.g., 'Subtotal (2000) + CGST/SGST (360) does not equal Net Payable Total (1500)'). Otherwise, return null.",
   reportedSubtotal: "Number: The subtotal amount printed on the invoice bill (if present, otherwise 0). E.g. 2000.00.",
   reportedTax: "Number: The total tax amount (CGST + SGST or other tax rows added together) printed on the invoice bill (if present, otherwise 0). E.g. 360.00.",
-  reportedNetPayable: "Number: The final net payable total printed on the invoice bill (if present, otherwise 0). E.g. 1500.00."
+  reportedNetPayable: "Number: The final net payable total printed on the invoice bill (if present, otherwise 0). E.g. 1500.00.",
+  lineItems: [
+    {
+      description: "String: Description of the line item on the bill (e.g. 'Consultation Fee', 'Diagnostic Test: CBC')",
+      amount: "Number: Billed amount for this line item (e.g. 1000.00 or 250.00)"
+    }
+  ]
 };
 
 // System Prompt for structured vision extraction
@@ -40,7 +46,8 @@ Important Rules:
    - 'OPD': Any general physician, general pharmacy, or routine diagnostic checks (like blood tests).
 5. Normalize the doctorReg number if possible, ensuring it captures the state/number/year structure.
 6. Pay extreme attention to the mathematics on invoice bills. Verify that the sum of consultation fees, test charges, medicines, etc. plus taxes equals the final net payable total. If it does not, set invoiceMathValid to false and describe the error in invoiceMathDetails.
-7. Be sure to extract the printed subtotal (reportedSubtotal), the printed tax amount (reportedTax), and the printed final total (reportedNetPayable) as numbers.`;
+7. Be sure to extract the printed subtotal (reportedSubtotal), the printed tax amount (reportedTax), and the printed final total (reportedNetPayable) as numbers.
+8. Extract ALL individual line items listed in the invoice table/bill under 'lineItems' with their exact description and numeric amount.`;
 
 /**
  * Helper to load test case mock data from local test_cases.json
@@ -93,6 +100,15 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
     const repTax = testCaseId === 'TC001' ? 360 : 0;
     const repNetPayable = testCaseId === 'TC001' ? 1500 : (Number(inputData.claim_amount) || 0);
 
+    const mockLineItems = testCaseId === 'TC001' ? [
+      { description: "Consultation Fee", amount: 1000 },
+      { description: "Diagnostic Tests", amount: 500 },
+      { description: "Diagnostic Test: CBC", amount: 250 },
+      { description: "Diagnostic Test: Dengue test", amount: 250 }
+    ] : [
+      { description: "Consultation Fee/Treatment Cost", amount: Number(inputData.claim_amount) || 0 }
+    ];
+
     // Build extraction schema mock structure
     const mockData = {
       patientName,
@@ -112,7 +128,8 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
       invoiceMathDetails: mathDetails,
       reportedSubtotal: repSubtotal,
       reportedTax: repTax,
-      reportedNetPayable: repNetPayable
+      reportedNetPayable: repNetPayable,
+      lineItems: mockLineItems
     };
 
     console.log(`[Mock Fallback] Successfully constructed mock OCR data for ${testCaseId} (${docType})`);
