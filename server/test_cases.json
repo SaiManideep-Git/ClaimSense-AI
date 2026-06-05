@@ -161,7 +161,11 @@
           },
           "bill": {
             "consultation_fee": 1000,
-            "therapy_charges": 3000
+            "therapy_charges": 2389.83,
+            "subtotal": 3389.83,
+            "cgst": 305.08,
+            "sgst": 305.09,
+            "net_payable": 4000.00
           }
         }
       },

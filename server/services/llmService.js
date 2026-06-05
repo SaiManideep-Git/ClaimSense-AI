@@ -96,18 +96,21 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
       ? "Arithmetic mismatch: Sum of itemized charges (₹1000 + ₹500 + ₹250 + ₹250 = ₹2000) and taxes (₹360) does not equal the Net Payable Total (₹1500) shown on the invoice. The diagnostic tests were double-counted."
       : null;
 
-    const repSubtotal = testCaseId === 'TC001' ? 2000 : (Number(inputData.claim_amount) || 0);
-    const repTax = testCaseId === 'TC001' ? 360 : 0;
-    const repNetPayable = testCaseId === 'TC001' ? 1500 : (Number(inputData.claim_amount) || 0);
+    const repSubtotal = testCaseId === 'TC001' ? 2000 : (testCaseId === 'TC006' ? 3389.83 : (Number(inputData.claim_amount) || 0));
+    const repTax = testCaseId === 'TC001' ? 360 : (testCaseId === 'TC006' ? 610.17 : 0);
+    const repNetPayable = testCaseId === 'TC001' ? 1500 : (testCaseId === 'TC006' ? 4000 : (Number(inputData.claim_amount) || 0));
 
     const mockLineItems = testCaseId === 'TC001' ? [
       { description: "Consultation Fee", amount: 1000 },
       { description: "Diagnostic Tests", amount: 500 },
       { description: "Diagnostic Test: CBC", amount: 250 },
       { description: "Diagnostic Test: Dengue test", amount: 250 }
+    ] : (testCaseId === 'TC006' ? [
+      { description: "Consultation Fee", amount: 1000 },
+      { description: "Therapy Charges", amount: 2389.83 }
     ] : [
       { description: "Consultation Fee/Treatment Cost", amount: Number(inputData.claim_amount) || 0 }
-    ];
+    ]);
 
     // Build extraction schema mock structure
     const mockData = {
