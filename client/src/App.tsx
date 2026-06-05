@@ -1144,7 +1144,7 @@ export default function App() {
                       </div>
 
                       {/* Documents File Drag and Drop */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                         
                         {/* Prescription Uploader */}
                         <div className="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/20 hover:border-brand-500/40 transition text-center flex flex-col justify-center min-h-[140px]">
@@ -1183,6 +1183,26 @@ export default function App() {
                           </label>
                           {billFile && (
                             <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {billFile.name}</span>
+                          )}
+                        </div>
+
+                        {/* Diagnostic Report Uploader */}
+                        <div className="border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/20 hover:border-brand-500/40 transition text-center flex flex-col justify-center min-h-[140px]">
+                          <FileUp className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+                          <span className="text-xs font-semibold text-slate-300 block mb-1">Diagnostic Report (Optional)</span>
+                          <span className="text-[10px] text-slate-500 block mb-3">Required for scan claims</span>
+                          
+                          <label className="inline-block bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-4 py-1.5 rounded text-[11px] cursor-pointer max-w-[160px] mx-auto transition">
+                            Select File
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={e => setReportFile(e.target.files?.[0] || null)}
+                              className="hidden"
+                            />
+                          </label>
+                          {reportFile && (
+                            <span className="text-[10px] text-emerald-400 font-mono mt-2 truncate block px-2">{"\u2713"} {reportFile.name}</span>
                           )}
                         </div>
 

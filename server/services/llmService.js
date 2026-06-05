@@ -16,7 +16,9 @@ const extractionSchema = {
   procedures: ["Array of clinical procedures performed (e.g. Root canal, Dressing, Teeth whitening)"],
   diagnosis: "Primary diagnosis or clinical symptoms (e.g. Viral fever, Tooth decay, Gastroenteritis)",
   findings: "For reports: clinical findings, lab observations, or diagnostic impression (e.g. L4-L5 disc bulge, normal blood counts, clear chest)",
-  claimType: "Strictly one of: 'OPD' (general consultation/pharmacy/report), 'Dental', 'Vision', 'Alternative' (Ayurveda/Homeopathy)"
+  claimType: "Strictly one of: 'OPD' (general consultation/pharmacy/report), 'Dental', 'Vision', 'Alternative' (Ayurveda/Homeopathy)",
+  invoiceMathValid: "Boolean: Perform strict mathematical validation. Sum all individual itemized fees, taxes, and discounts on the bill. Does their sum match the printed subtotal and net payable total? Return false if there is a calculation error, double-counting, or inconsistency. Set to true if the math is correct.",
+  invoiceMathDetails: "String: If invoiceMathValid is false, write a detailed explanation of the arithmetic discrepancy or double-counting (e.g., 'Subtotal (2000) + CGST/SGST (360) does not equal Net Payable Total (1500)'). Otherwise, return null."
 };
 
 // System Prompt for structured vision extraction
@@ -33,7 +35,8 @@ Important Rules:
    - 'Vision': Eye checkup, spectacles, contact lenses.
    - 'Alternative': Ayurveda, Homeopathy, Vaidya clinics.
    - 'OPD': Any general physician, general pharmacy, or routine diagnostic checks (like blood tests).
-5. Normalize the doctorReg number if possible, ensuring it captures the state/number/year structure.`;
+5. Normalize the doctorReg number if possible, ensuring it captures the state/number/year structure.
+6. Pay extreme attention to the mathematics on invoice bills. Verify that the sum of consultation fees, test charges, medicines, etc. plus taxes equals the final net payable total. If it does not, set invoiceMathValid to false and describe the error in invoiceMathDetails.`;
 
 /**
  * Helper to load test case mock data from local test_cases.json
@@ -76,6 +79,12 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
     const doctorReg = pres.doctor_reg || bill.doctor_reg || 'KA/45678/2015';
     const consultationDate = claimContext.treatmentDate || inputData.treatment_date || '2024-11-01';
 
+    // Math checks for mock data (TC001 has a known math discrepancy)
+    const isMathValid = testCaseId !== 'TC001';
+    const mathDetails = testCaseId === 'TC001'
+      ? "Arithmetic mismatch: Sum of itemized charges (₹1000 + ₹500 + ₹250 + ₹250 = ₹2000) and taxes (₹360) does not equal the Net Payable Total (₹1500) shown on the invoice. The diagnostic tests were double-counted."
+      : null;
+
     // Build extraction schema mock structure
     const mockData = {
       patientName,
@@ -90,7 +99,9 @@ function getMockTestCaseData(testCaseId, docType, claimContext) {
       procedures: pres.procedures || bill.procedures || [],
       diagnosis: pres.diagnosis || 'Viral fever',
       findings: pres.treatment || '',
-      claimType
+      claimType,
+      invoiceMathValid: isMathValid,
+      invoiceMathDetails: mathDetails
     };
 
     console.log(`[Mock Fallback] Successfully constructed mock OCR data for ${testCaseId} (${docType})`);

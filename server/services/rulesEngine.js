@@ -175,6 +175,27 @@ function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
     return result;
   }
 
+  // 5. Mathematical discrepancy or double-counting on invoice
+  if (extractedData && extractedData.invoiceMathValid === false) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('FRAUD_DETECTION');
+    result.confidenceScore = 0.35;
+    result.notes = `Claim rejected due to invoice arithmetic discrepancy: ${extractedData.invoiceMathDetails || 'The sum of itemized charges, subtotals, and taxes on the invoice is mathematically inconsistent.'}`;
+    result.nextSteps = 'Please submit a corrected invoice bill with accurate line items, subtotal, and tax calculations from your healthcare provider.';
+    return result;
+  }
+
+  // 6. User claimed amount vs. Extracted invoice amount discrepancy
+  const extractedTotal = Number(extractedData?.claimAmount || 0);
+  if (extractedTotal > 0 && Math.abs(claimAmount - extractedTotal) > 10) {
+    result.decision = 'REJECTED';
+    result.rejectionReasons.push('FRAUD_DETECTION');
+    result.confidenceScore = 0.40;
+    result.notes = `Claim rejected: The claimed amount (₹${claimAmount}) does not match the net payable amount extracted from the invoice (₹${extractedTotal}).`;
+    result.nextSteps = 'Please ensure the claim amount matches the Net Payable Total printed on your invoice.';
+    return result;
+  }
+
   // ----------------------------------------------------
   // STEP 1: Basic Eligibility Check
   // ----------------------------------------------------
