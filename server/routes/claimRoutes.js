@@ -327,7 +327,13 @@ router.post('/submit', upload, async (req, res) => {
       tests: testsCombined,
       procedures: proceduresCombined,
       diagnosis: prescriptionExtracted.diagnosis || billExtracted.diagnosis || 'OPD Consultation',
-      claimType: prescriptionExtracted.claimType || billExtracted.claimType || 'OPD'
+      claimType: prescriptionExtracted.claimType || billExtracted.claimType || 'OPD',
+      invoiceMathValid: billExtracted.invoiceMathValid !== undefined ? billExtracted.invoiceMathValid : true,
+      invoiceMathDetails: billExtracted.invoiceMathDetails || null,
+      reportedSubtotal: Number(billExtracted.reportedSubtotal || 0),
+      reportedTax: Number(billExtracted.reportedTax || 0),
+      reportedNetPayable: Number(billExtracted.reportedNetPayable || 0),
+      lineItems: billExtracted.lineItems || []
     };
 
     // D. Fetch YTD Approved Amount for Annual Limit check
