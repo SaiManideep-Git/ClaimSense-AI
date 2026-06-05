@@ -615,5 +615,32 @@ router.put('/:id/adjudicate', async (req, res) => {
   }
 });
 
+/**
+ * TEMPORARY: Endpoint to save client-generated canvas mock PNG files to public/samples/
+ */
+router.post('/save-sample', async (req, res) => {
+  try {
+    const { filename, base64Data } = req.body;
+    if (!filename || !base64Data) {
+      return res.status(400).json({ error: 'Missing filename or base64Data' });
+    }
+    
+    const cleanData = base64Data.replace(/^data:image\/png;base64,/, "");
+    const buffer = Buffer.from(cleanData, 'base64');
+    
+    const targetDir = path.join(__dirname, '../../client/public/samples');
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    
+    const targetPath = path.join(targetDir, filename);
+    fs.writeFileSync(targetPath, buffer);
+    console.log(`[Sample Generator] Saved sample: ${filename} to ${targetPath}`);
+    res.json({ success: true, path: targetPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 

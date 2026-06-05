@@ -408,6 +408,54 @@ export default function App() {
   const [isFetchingEmployee, setIsFetchingEmployee] = useState(false);
   const [employeeFetchError, setEmployeeFetchError] = useState('');
 
+  const generateAndSaveAllSamples = async () => {
+    console.log("Starting static samples generation...");
+    try {
+      for (const tc of testCasesData.test_cases) {
+        const id = tc.case_id;
+        const input = tc.input_data;
+        const docTypes: ('prescription' | 'bill' | 'report')[] = ['prescription', 'bill', 'report'];
+        
+        for (const type of docTypes) {
+          const hasTests = 
+            (input.documents?.prescription?.tests_prescribed && input.documents.prescription.tests_prescribed.length > 0) ||
+            (input.documents?.bill?.test_names && input.documents.bill.test_names.length > 0);
+          
+          if (type === 'report' && !hasTests) {
+            continue; // Only generate reports for cases that need them
+          }
+
+          // Generate using our high-fidelity canvas renderer
+          const file = await createCanvasDocument(type, id, tc);
+          
+          // Convert file to base64
+          const reader = new FileReader();
+          const base64Promise = new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+          const base64Data = await base64Promise;
+          
+          const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
+          const filename = `${id}_${capitalizedType}.png`;
+          
+          // Post to backend
+          const res = await fetch(`${API_URL}/api/claims/save-sample`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename, base64Data })
+          });
+          const result = await res.json();
+          console.log(`[Sample Generator] Generated and saved ${filename}:`, result.success);
+        }
+      }
+      alert("All mock document PNG files (Prescriptions, Bills, and Reports) have been successfully generated and saved to 'client/public/samples/'!");
+    } catch (err: any) {
+      console.error("Failed to pre-generate sample files:", err);
+      alert(`Error generating samples: ${err.message}`);
+    }
+  };
+
   // Fetch employee details automatically when memberId is entered
   useEffect(() => {
     if (!memberId) {
@@ -872,6 +920,12 @@ export default function App() {
                 <span className="text-xs text-slate-500 font-semibold px-2 py-2">Authentication Required</span>
               )}
             </nav>
+            <button
+              onClick={generateAndSaveAllSamples}
+              className="px-3 py-1.5 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white font-bold text-[10px] uppercase tracking-wider shadow transition cursor-pointer mr-2 border border-amber-500/20"
+            >
+              Generate Static Assets
+            </button>
 
             <div className="flex items-center bg-slate-900 border border-slate-850 p-1 rounded-xl">
               <button
