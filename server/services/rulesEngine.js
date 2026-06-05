@@ -7,15 +7,15 @@ try {
   const policyPath = path.join(__dirname, '../../plum_intern_assignment/policy_terms.json');
   defaultPolicy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
   if (defaultPolicy) {
-    defaultPolicy.expiration_date = defaultPolicy.expiration_date || "2024-12-31";
+    defaultPolicy.expiration_date = defaultPolicy.expiration_date || "2028-12-31";
   }
 } catch (e) {
   console.error('Failed to load default policy_terms.json:', e.message);
   // Fallback default policy copy
   defaultPolicy = {
     policy_id: "PLUM_OPD_2024",
-    effective_date: "2024-01-01",
-    expiration_date: "2024-12-31",
+    effective_date: "2026-01-01",
+    expiration_date: "2028-12-31",
     coverage_details: {
       annual_limit: 50000,
       per_claim_limit: 5000,
@@ -186,8 +186,8 @@ function adjudicateClaimInner(claim, extractedData, policy = defaultPolicy) {
   const initialWaitingDays = policy.initialWaitingDays !== undefined ? policy.initialWaitingDays : (policy.waiting_periods?.initial_waiting || 30);
   const chronicWaitingDays = policy.chronicWaitingDays !== undefined ? policy.chronicWaitingDays : (policy.waiting_periods?.specific_ailments?.diabetes || 90);
   
-  const effectiveDate = policy.effectiveDate || policy.effective_date || "2024-01-01";
-  const expirationDate = policy.expirationDate || policy.expiration_date || "2024-12-31";
+  const effectiveDate = policy.effectiveDate || policy.effective_date || "2026-01-01";
+  const expirationDate = policy.expirationDate || policy.expiration_date || "2028-12-31";
 
   const treatmentDateStr = claim.treatmentDate || claim.treatment_date || (extractedData && extractedData.consultationDate);
   const treatmentDate = new Date(treatmentDateStr);

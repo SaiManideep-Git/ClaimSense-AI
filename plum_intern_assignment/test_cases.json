@@ -7,7 +7,7 @@
       "input_data": {
         "member_id": "EMP001",
         "member_name": "Rajesh Kumar",
-        "treatment_date": "2024-11-01",
+        "treatment_date": "2026-05-01",
         "claim_amount": 1500,
         "documents": {
           "prescription": {
@@ -39,7 +39,7 @@
       "input_data": {
         "member_id": "EMP002",
         "member_name": "Priya Singh",
-        "treatment_date": "2024-10-15",
+        "treatment_date": "2026-05-05",
         "claim_amount": 12000,
         "documents": {
           "prescription": {
@@ -68,7 +68,7 @@
       "input_data": {
         "member_id": "EMP003",
         "member_name": "Amit Verma",
-        "treatment_date": "2024-10-20",
+        "treatment_date": "2026-05-08",
         "claim_amount": 7500,
         "documents": {
           "prescription": {
@@ -97,7 +97,7 @@
       "input_data": {
         "member_id": "EMP004",
         "member_name": "Sneha Reddy",
-        "treatment_date": "2024-10-25",
+        "treatment_date": "2026-05-12",
         "claim_amount": 2000,
         "documents": {
           "bill": {
@@ -120,8 +120,8 @@
       "input_data": {
         "member_id": "EMP005",
         "member_name": "Vikram Joshi",
-        "member_join_date": "2024-09-01",
-        "treatment_date": "2024-10-15",
+        "member_join_date": "2026-04-01",
+        "treatment_date": "2026-05-15",
         "claim_amount": 3000,
         "documents": {
           "prescription": {
@@ -139,7 +139,7 @@
       "expected_output": {
         "decision": "REJECTED",
         "rejection_reasons": ["WAITING_PERIOD"],
-        "notes": "Diabetes has 90-day waiting period. Eligible from 2024-11-30",
+        "notes": "Diabetes has 90-day waiting period. Eligible from 2026-06-30",
         "confidence_score": 0.96
       }
     },
@@ -150,7 +150,7 @@
       "input_data": {
         "member_id": "EMP006",
         "member_name": "Kavita Nair",
-        "treatment_date": "2024-10-28",
+        "treatment_date": "2026-05-18",
         "claim_amount": 4000,
         "documents": {
           "prescription": {
@@ -179,7 +179,7 @@
       "input_data": {
         "member_id": "EMP007",
         "member_name": "Suresh Patil",
-        "treatment_date": "2024-11-02",
+        "treatment_date": "2026-05-22",
         "claim_amount": 15000,
         "documents": {
           "prescription": {
@@ -207,7 +207,7 @@
       "input_data": {
         "member_id": "EMP008",
         "member_name": "Ravi Menon",
-        "treatment_date": "2024-10-30",
+        "treatment_date": "2026-05-25",
         "claim_amount": 4800,
         "previous_claims_same_day": 3,
         "documents": {
@@ -236,7 +236,7 @@
       "input_data": {
         "member_id": "EMP009",
         "member_name": "Anita Desai",
-        "treatment_date": "2024-10-18",
+        "treatment_date": "2026-05-28",
         "claim_amount": 8000,
         "documents": {
           "prescription": {
@@ -265,7 +265,7 @@
       "input_data": {
         "member_id": "EMP010",
         "member_name": "Deepak Shah",
-        "treatment_date": "2024-11-03",
+        "treatment_date": "2026-06-01",
         "claim_amount": 4500,
         "hospital": "Apollo Hospitals",
         "cashless_request": true,
