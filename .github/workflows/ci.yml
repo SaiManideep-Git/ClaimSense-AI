@@ -27,61 +27,10 @@ jobs:
           npm install
 
       - name: Run Rules Adjudication Test Case Verifier
-        # Runs a quick Node script to execute rulesEngine directly and verify accuracy
+        # Executes the rules engine test suite via the npm test script
         run: |
           cd server
-          node -e "
-            const { adjudicateClaim } = require('./services/rulesEngine');
-            const fs = require('fs');
-            const path = require('path');
-            
-            const tcData = JSON.parse(fs.readFileSync('../plum_intern_assignment/test_cases.json', 'utf8'));
-            let failures = 0;
-            
-            tcData.test_cases.forEach(tc => {
-              const input = tc.input_data;
-              const expected = tc.expected_output;
-              
-              const claimContext = {
-                memberId: input.member_id,
-                memberName: input.member_name,
-                treatmentDate: input.treatment_date,
-                claimAmount: input.claim_amount,
-                hospital: input.hospital || '',
-                cashlessRequest: input.cashless_request || false,
-                memberJoinDate: input.member_join_date || null,
-                previousClaimsSameDay: input.previous_claims_same_day || 0
-              };
-              
-              const extractedData = {
-                patientName: input.member_name,
-                hospitalName: input.hospital || '',
-                doctorName: input.documents?.prescription?.doctor_name || '',
-                doctorReg: input.documents?.prescription?.doctor_reg || '',
-                consultationDate: input.treatment_date,
-                claimAmount: input.claim_amount,
-                consultationFee: input.documents?.bill?.consultation_fee || 0,
-                medicines: input.documents?.prescription?.medicines_prescribed || [],
-                tests: input.documents?.prescription?.tests_prescribed || input.documents?.bill?.test_names || [],
-                procedures: input.documents?.prescription?.procedures || [],
-                diagnosis: input.documents?.prescription?.diagnosis || '',
-                claimType: input.documents?.prescription?.procedures ? 'Dental' : 'OPD'
-              };
-              
-              const res = adjudicateClaim(claimContext, extractedData);
-              if (res.decision !== expected.decision) {
-                console.error('Mismatch on ' + tc.case_id + ': Expected ' + expected.decision + ', got ' + res.decision);
-                failures++;
-              }
-            });
-            
-            if (failures > 0) {
-              console.error(failures + ' test cases failed!');
-              process.exit(1);
-            } else {
-              console.log('All rules tests passed successfully!');
-            }
-          "
+          npm test
 
   # Job 2: Typecheck & Build Frontend
   frontend-build:
